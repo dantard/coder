@@ -6,7 +6,8 @@ import time
 import yaml
 from PyQt5 import QtGui
 from PyQt5.QtWidgets import QApplication, QMainWindow, QSplitter, QTextEdit, QPushButton, QVBoxLayout, QWidget, \
-    QToolBar, QComboBox, QTabWidget, QMenu, QMenuBar, QFileDialog, QShortcut, QTabBar, QStatusBar
+    QToolBar, QComboBox, QTabWidget, QMenu, QMenuBar, QFileDialog, QShortcut, QTabBar, QStatusBar, QHBoxLayout, \
+    QPlainTextEdit
 from PyQt5.QtCore import Qt, QRegExp, pyqtSignal, QTimer, QEvent
 from PyQt5.QtGui import QTextCharFormat, QColor, QFont, QSyntaxHighlighter, QPixmap, QPainter, QCursor, QIcon
 from qtconsole.rich_jupyter_widget import RichJupyterWidget
@@ -116,7 +117,6 @@ class PythonEditor(QTextEdit):
         print("hhhhh")
         self.info.emit(self.get_next_line(), 0)
         while self.count < len(self.code):
-            QApplication.processEvents()
             #self.setText(self.toPlainText() + self.code[self.count])
             self.insertPlainText(self.code[self.count])
             self.moveCursor(QtGui.QTextCursor.End)
@@ -339,6 +339,11 @@ class MainWindow(QMainWindow):
         self.text_edit.setPlaceholderText("Write Python code here...")
         self.text_edit.installEventFilter(self)
 
+
+        self.line_number_area = PythonEditor(self.font_size)
+        self.line_number_area.setStyleSheet("QTextEdit { color: #a0a0a0;}")
+        self.line_number_area.setContentsMargins(0, 0, 0, 0)
+        self.text_edit.setContentsMargins(0, 0, 0, 0)
         self.highlighter = PythonHighlighter(self.text_edit.document())
 
         bar = QToolBar()
@@ -352,7 +357,47 @@ class MainWindow(QMainWindow):
 
         left_layout.addWidget(bar)
         left_layout.addWidget(self.prog_cb)
-        left_layout.addWidget(self.text_edit)
+
+        lay = QHBoxLayout()
+        lay.setContentsMargins(0, 0, 0, 0)
+        lay.setSpacing(0)
+
+        #left_layout.addWidget(self.text_edit)
+        self.line_number_area.setReadOnly(True)
+        self.line_number_area.setMaximumWidth(50)
+        lay.addWidget(self.line_number_area)
+        lay.addWidget(self.text_edit)
+        self.text_edit.setLineWrapMode(QTextEdit.NoWrap)
+
+        self.text_edit.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.line_number_area.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.line_number_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+
+        def text_changed():
+            text = self.text_edit.toPlainText()
+            lines = text.split("\n")
+            cursor_pos = self.text_edit.textCursor().position()
+            v1 = self.line_number_area.verticalScrollBar().value()
+            self.line_number_area.blockSignals(True)
+            self.line_number_area.clear()
+            text = ""
+
+            for i in range(len(lines) + 1):
+                #self.line_number_area.append("{:3d}".format(i + 1))
+                text += "{:3d}\n".format(i + 1)
+            self.line_number_area.setPlainText(text)
+
+            #self.text_edit.setTextCursor(self.text_edit.textCursor())
+            self.line_number_area.verticalScrollBar().setValue(v1)
+            self.line_number_area.blockSignals(False)
+
+
+        self.text_edit.textChanged.connect(text_changed)
+        self.text_edit.verticalScrollBar().valueChanged.connect(self.line_number_area.verticalScrollBar().setValue)
+        self.text_edit.horizontalScrollBar().rangeChanged.connect(text_changed)
+        self.line_number_area.verticalScrollBar().valueChanged.connect(self.text_edit.verticalScrollBar().setValue)
+
+        left_layout.addLayout(lay)
 
         self.sb = QStatusBar()
         left_layout.addWidget(self.sb)
