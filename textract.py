@@ -185,6 +185,18 @@ class Slides(QWidget):
 
 
     def update_image(self):
+        page = self.doc[self.page]
+        print("DDDDDDDDDDDDDDDDDDD", page.get_drawings())
+        for d in page.get_drawings():
+            fill = d.get("fill")
+            type = d.get("type")
+            if type != 'f':
+                rect = d.get("rect")
+                print(rect)
+                page.draw_rect(rect, color=(0, 0, 0), width=5)
+
+        print(f"\nPage {self.page + 1}")
+
         pix = self.doc[self.page].get_pixmap(matrix=fitz.Matrix(4, 4), alpha=False, annots=True)
         image = QImage(pix.samples, pix.width, pix.height, pix.stride, QImage.Format_RGB888)
         self.pixmap = QPixmap(image)  # QPixmap("/home/danilo/Pictures/aaa.png")
@@ -236,7 +248,6 @@ class Slides(QWidget):
         lines = []
         try:
             page = self.doc[self.page]
-            print(f"\nPage {self.page + 1}")
 
             # Extract blocks of text
             blocks = page.get_text("dict")['blocks']
