@@ -206,7 +206,6 @@ class Slides(QWidget):
             fill = d.get("fill")
             type = d.get("type")
             color = d.get("color")
-            print(color)
 
             if type != 'f' and color == (1.0,0,1.0):
                 rect = d.get("rect")
@@ -281,7 +280,7 @@ class Slides(QWidget):
         except Exception as e:
             print(f"An error occurred: {e}")
 
-        print("lines", lines)
+        # print("lines", lines)
 
         if len(lines) != 0:
             rect: Rect

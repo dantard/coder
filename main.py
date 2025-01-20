@@ -41,7 +41,7 @@ class PythonHighlighter(QSyntaxHighlighter):
                    ]
 
 
-        print(set(keywords))
+        #print(set(keywords))
 
         self.highlighting_rules += [(f"\\b{k}\\b", keyword_format) for k in keywords]
 
@@ -103,6 +103,7 @@ class PythonEditor(QTextEdit):
     def set_mode(self, mode):
         self.mode = mode
         self.setCursorWidth(3 if self.mode == 1 else 1)
+        self.setReadOnly(self.mode == 1)
         self.update()
 
     def __init__(self, font_size=18):
@@ -120,7 +121,6 @@ class PythonEditor(QTextEdit):
         self.count = 0
 
     def complete_line(self, sleep=True):
-        print("hhhhh")
         self.info.emit(self.get_next_line(), 0)
         while self.count < len(self.code):
             #self.setText(self.toPlainText() + self.code[self.count])
@@ -232,7 +232,7 @@ class PythonEditor(QTextEdit):
                     self.ctrl_enter.emit()
                 elif current_line.endswith(":"):
                     # is the cursor at the end of the line?
-                    print(self.textCursor().positionInBlock(), len(current_line))
+                    # print(self.textCursor().positionInBlock(), len(current_line))
                     if self.textCursor().positionInBlock() == len(current_line):
                         self.insertPlainText("\n" + " " * (spaces + 4))
                     else:
@@ -254,7 +254,7 @@ class PythonEditor(QTextEdit):
         remaining = remaining.split("\n")
         remaining = remaining[1:]
         remaining = [x for x in remaining if x.strip()]
-        print(remaining)
+        # print(remaining)
         if remaining:
             return remaining[0]
 
@@ -298,6 +298,7 @@ class MainWindow(QMainWindow):
         self.resize(1000, 600)
 
         self.tabs = QTabWidget()
+
         # put tabs bottom
         self.tabs.setTabPosition(QTabWidget.South)
         self.tabs.setTabsClosable(True)
@@ -308,6 +309,13 @@ class MainWindow(QMainWindow):
         self.toolbar = QToolBar(self.tabs)
         prev = self.toolbar.addAction("✕", lambda : self.move_to(False))
         prev.setIcon(self.style().standardIcon(QApplication.style().SP_ArrowBack))
+        # set color black and alhpa 0.5
+        self.toolbar.setStyleSheet("background-color:  rgba(0, 0, 0, 0.1);")
+        self.toolbar.setMovable(True)
+        self.toolbar.setFloatable(True)
+        self.tabs.setStyleSheet("QTabBar::tab { height: 35px; }");
+
+
 
         pointer = self.toolbar.addAction("Pointer", self.set_pointer)
         pointer.setIcon(QIcon(create_cursor_image(25)))
@@ -498,7 +506,7 @@ class MainWindow(QMainWindow):
 
     def resizeEvent(self, a0):
         super().resizeEvent(a0)
-        self.toolbar.setGeometry(self.width() - 150, self.height() - 55, 150, 40)
+        self.toolbar.setGeometry(self.width() - 150, self.height() - 56, 140, 40)
 
     def clear_all(self):
         self.jupyter_widget.execute("%clear")
@@ -584,10 +592,10 @@ class MainWindow(QMainWindow):
     def eventFilter(self, source, event):
         if event.type() == QEvent.KeyPress:  # Check if the event is a key press
             if event.text() == "ñ":
-                print(f"Key pressed2: {event.text()}")
+                #print(f"Key pressed2: {event.text()}")
                 return True
-            else:
-                print(f"Key pressed: {event.text()}")
+            #else:
+                # print(f"Key pressed: {event.text()}")
         return super().eventFilter(source, event)
 
 
