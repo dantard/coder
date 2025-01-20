@@ -10,6 +10,7 @@ from PyQt5.QtCore import Qt, QTimer, pyqtSignal
 from PyQt5.QtGui import QPixmap, QImage, QFont, QPainter, QColor, QCursor, QIcon
 from PyQt5.QtWidgets import QMainWindow, QLabel, QSizePolicy, QApplication, QVBoxLayout, QWidget, QPushButton, \
     QShortcut, QInputDialog, QTabBar, QToolBar, QHBoxLayout, QComboBox
+from pymupdf import Rect
 
 from utils import create_cursor_image
 
@@ -25,7 +26,7 @@ class Slides(QWidget):
         self.touchable = True
         self.cursor_image = create_cursor_image()
         self.program = ""
-        self.code_pos = None
+        self.code_buttons = []
         self.code_line_height = 0
         self.resized_pixmap = None
         self.doc = fitz.open(pdf_path)
@@ -44,28 +45,25 @@ class Slides(QWidget):
 
         self.pixmap = None
 
-        self.play_button = QPushButton(self.image_label)
-        self.play_button.setIcon(self.style().standardIcon(QApplication.style().SP_MediaPlay))
-        self.play_button.setVisible(False)
-        #self.play_button.setFlat(True)
-        #self.play_button.setStyleSheet("font-size: 16px; background-color: white; border: 1px solid black;")
-        self.play_button.clicked.connect(self.play_program)
-
-        self.cmd_bar = QWidget()
-        self.cmd_bar.setLayout(QVBoxLayout())
-        self.cmd_bar.setMaximumWidth(40)
-
-        a2 = QPushButton()
-        a2.setIcon(self.style().standardIcon(QApplication.style().SP_ArrowBack))
-        a2.setFixedSize(40,40)
-        a2.setFlat(True)
-        a2.clicked.connect(lambda: self.move_to(False))
+        # self.play_button = QPushButton(self.image_label)
+        # self.play_button.setIcon(self.style().standardIcon(QApplication.style().SP_MediaPlay))
+        # self.play_button.setVisible(False)
+        # #self.play_button.setFlat(True)
+        # #self.play_button.setStyleSheet("font-size: 16px; background-color: white; border: 1px solid black;")
+        # self.play_button.clicked.connect(self.play_program)
 
         a1 = QPushButton()
         a1.setIcon(self.style().standardIcon(QApplication.style().SP_ArrowForward))
         a1.setFixedSize(40,40)
         a1.setFlat(True)
         a1.clicked.connect(lambda: self.move_to(True))
+
+
+        a2 = QPushButton()
+        a2.setIcon(self.style().standardIcon(QApplication.style().SP_ArrowBack))
+        a2.setFixedSize(40,40)
+        a2.setFlat(True)
+        a2.clicked.connect(lambda: self.move_to(False))
 
         a3 = QPushButton()
         a3.setIcon(QIcon(self.cursor_image))
@@ -74,15 +72,21 @@ class Slides(QWidget):
         a3.clicked.connect(lambda: self.toggle_cursor())
 
         a0 = QWidget()
-        a0.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        a0.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
         a9 = QWidget()
         a9.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
-        self.cmd_bar.layout().addWidget(a0)
-        self.cmd_bar.layout().addWidget(a2)
-        self.cmd_bar.layout().addWidget(a3)
-        self.cmd_bar.layout().addWidget(a1)
-        #self.cmd_bar.layout().addWidget(a9)
+        buttons_vertical_layout = QVBoxLayout()
+        buttons_vertical_layout.setSpacing(0)
+        buttons_vertical_layout.addWidget(a0)
+        buttons_vertical_layout.addWidget(a1)
+        buttons_vertical_layout.addWidget(a3)
+        buttons_vertical_layout.addWidget(a2)
+
+        # self.cmd_bar.layout().addWidget(a0)
+        # self.cmd_bar.layout().addWidget(a2)
+        # self.cmd_bar.layout().addWidget(a3)
+
 
 
 
@@ -97,8 +101,10 @@ class Slides(QWidget):
 
         # Set up a layout
         layout = QHBoxLayout()
+        layout.setSpacing(0)
         layout.addWidget(self.image_label)
-        #layout.addWidget(self.cmd_bar)
+        #layout.addLayout(buttons_vertical_layout)
+
 
 
 
@@ -121,11 +127,10 @@ class Slides(QWidget):
                     }
                 """)
 
-    def play_program(self):
-        print(self.program)
+    def play_program(self, program):
+        #print(program)
         self.setFocus()
-
-        self.play_code.emit(self.program)
+        self.play_code.emit(program)
         return
 
         # Command to open a new terminal and execute the Python code
@@ -186,29 +191,37 @@ class Slides(QWidget):
 
     def update_image(self):
         page = self.doc[self.page]
-        print("DDDDDDDDDDDDDDDDDDD", page.get_drawings())
-        for d in page.get_drawings():
-            fill = d.get("fill")
-            type = d.get("type")
-            if type != 'f':
-                rect = d.get("rect")
-                print(rect)
-                page.draw_rect(rect, color=(0, 0, 0), width=5)
-
-        print(f"\nPage {self.page + 1}")
 
         pix = self.doc[self.page].get_pixmap(matrix=fitz.Matrix(4, 4), alpha=False, annots=True)
         image = QImage(pix.samples, pix.width, pix.height, pix.stride, QImage.Format_RGB888)
         self.pixmap = QPixmap(image)  # QPixmap("/home/danilo/Pictures/aaa.png")
         self.image_label.setPixmap(self.pixmap)
         self.resize_image()
-        self.extract_text_and_fonts()
+
+        for button, _ in self.code_buttons:
+            button.deleteLater()
+        self.code_buttons.clear()
+
+        for d in page.get_drawings():
+            fill = d.get("fill")
+            type = d.get("type")
+            color = d.get("color")
+            print(color)
+
+            if type != 'f' and color == (1.0,0,1.0):
+                rect = d.get("rect")
+                #print(d)
+                #page.draw_rect(rect, color=(0, 0, 0), width=5)
+
+                #print(f"\nPage {self.page + 1}")
+                self.extract_text_and_fonts(rect)
+
+        self.update_button_pos()
 
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
         self.resize_image()
-        self.cmd_bar.setGeometry(self.image_label.width() - 200, self.image_label.height()-50, 100, 50)
 
     def resize_image(self):
         # Resize the pixmap to fit the QLabel while maintaining aspect ratio
@@ -225,7 +238,6 @@ class Slides(QWidget):
 
     def keyPressEvent(self, a0):
         super().keyPressEvent(a0)
-        print("what?")
         if a0.key() == Qt.Key_Right or a0.key() == Qt.Key_Up:
             self.page = (self.page + 1) % len(self.doc)
             self.update_image()
@@ -244,71 +256,73 @@ class Slides(QWidget):
 
         return x_pos, y_pos
 
-    def extract_text_and_fonts(self):
+    def extract_text_and_fonts(self, rect=None):
         lines = []
         try:
             page = self.doc[self.page]
 
             # Extract blocks of text
-            blocks = page.get_text("dict")['blocks']
+            blocks = page.get_text("dict", clip=rect)['blocks']
             for block in blocks:
                 if 'lines' in block:  # Ensure the block contains text
                     #print("\nBlock:")
                     block_bbox = block['bbox']  # Get block position
-                    #print(f"Block Position: {block_bbox}")
-                    block_text = ""
                     for line in block['lines']:
+                        line_text = ""
+                        line_box = line["bbox"]
                         for span in line['spans']:
                             text = span['text']
                             font = span['font']
                             position = span['bbox']  # Get position of the span
-                            if "Courier" in font:
-                                #print(f"Text: {text}", f"Position: {position}")
-                                block_text += text
-                    if block_text != "":
-                        lines.append((block_text, block_bbox))
+                            line_text += text
+
+                        lines.append((line_text, line_box))
 
         except Exception as e:
             print(f"An error occurred: {e}")
 
+        print("lines", lines)
+
         if len(lines) != 0:
-            text, pos = lines[-1]
-            self.code_pos = (pos[0], pos[1], pos[2] - pos[0], pos[3] - pos[1])
+            rect: Rect
 
-            self.play_button.setVisible(True)
-            self.update_button_pos()
-        else:
-            self.play_button.setVisible(False)
+            xs = set()
+            for text, pos in lines:
+                x1,y1,x2,y2 = pos
+                x1 = int(x1)
+                xs.add(x1)
+            xs = list(xs)
+            xs.sort()
+            # print(xs)
 
-        xs = set()
-        for text, pos in lines:
-            x1,y1,x2,y2 = pos
-            x1 = int(x1)
-            xs.add(x1)
-        xs = list(xs)
-        xs.sort()
-        print(xs)
+            program = str()
+            for text, pos in lines:
+                x1,y1,x2,y2 = pos
+                x1 = int(x1)
+                i = xs.index(x1)*4
+                program += " "*i + text + "\n"
 
-        self.program = str()
-        for text, pos in lines:
-            x1,y1,x2,y2 = pos
-            x1 = int(x1)
-            i = xs.index(x1)*4
-            self.program += " "*i + text + "\n"
-            self.play_button.setToolTip(self.program)
+            code_pos = (rect.x0, rect.y0, rect.x1 - rect.x0, rect.y1 - rect.y0)
+
+            play_button = QPushButton(self.image_label)
+            play_button.setIcon(self.style().standardIcon(QApplication.style().SP_MediaPlay))
+            play_button.clicked.connect(lambda x=program, y=program: self.play_program(y))
+
+            self.code_buttons.append((play_button, code_pos))
+            play_button.setToolTip(self.program)
 
     def update_button_pos(self):
         image_x, image_y = self.get_image_pos()
-        p = 0.8
         zoom = self.resized_pixmap.width() / self.pixmap.width() *4
 
-        if self.code_pos is not None:
-            code_x, code_y, code_w, code_h = self.code_pos
+        for button, code_pos in self.code_buttons:
+            code_x, code_y, code_w, code_h = code_pos
 
-            self.play_button.setGeometry(int(image_x + (code_x + code_w)*zoom),
-                                         int(image_y + (code_y + code_h/2)*zoom-10),
+            button.setGeometry(int(image_x + (code_x + code_w)*zoom-25),
+                                         int(image_y + (code_y + code_h)*zoom-25),
                                          26, 26)
-
+            button.setVisible(True)
+            #print("wtf ", button.geometry())
 
 # app = QApplication(sys.argv)
 # window = Slides("/home/danilo/Downloads/aaa.pdf")

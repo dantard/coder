@@ -18,6 +18,12 @@ import autopep8
 
 from utils import create_cursor_image
 
+class CustomTabBar(QTabBar):
+    def __init__(self):
+        super().__init__()
+        # Customize the tab bar as needed
+        self.setStyleSheet("QTabBar::tab { background: lightblue; }")
+        self.a = QPushButton(self)
 
 class PythonHighlighter(QSyntaxHighlighter):
     def __init__(self, document):
@@ -314,7 +320,7 @@ class MainWindow(QMainWindow):
 
         next1 = self.toolbar.addAction("⬇", lambda : self.move_to(True))
         next1.setIcon(self.style().standardIcon(QApplication.style().SP_ArrowForward))
-
+        self.toolbar.setMaximumHeight(35)
         self.toolbar.show()
 
 
@@ -492,7 +498,7 @@ class MainWindow(QMainWindow):
 
     def resizeEvent(self, a0):
         super().resizeEvent(a0)
-        self.toolbar.setGeometry(self.tabs.width() - self.toolbar_pose, self.tabs.height() - 35, 150, 40)
+        self.toolbar.setGeometry(self.width() - 150, self.height() - 55, 150, 40)
 
     def clear_all(self):
         self.jupyter_widget.execute("%clear")
@@ -527,12 +533,13 @@ class MainWindow(QMainWindow):
             filename, ok = QFileDialog.getOpenFileName(self, "Open PDF file", filter="PDF files (*.pdf)", directory="slides")
 
         if filename:
-            name = filename.split("/")[-1]
-            slides = Slides(filename, page)
-            slides.play_code.connect(self.code_from_slide)
-            self.tabs.addTab(slides, name.replace(".pdf", ""))
-            self.tabs.setCurrentWidget(slides)
-            slides.image_label.setFocus()
+            name = filename.split("/")[-1].replace(".pdf", "")
+            if os.path.exists(filename):
+                slides = Slides(filename, page)
+                slides.play_code.connect(self.code_from_slide)
+                self.tabs.addTab(slides, name)
+                self.tabs.setCurrentWidget(slides)
+                slides.image_label.setFocus()
 
 
     def closeEvent(self, a0):
