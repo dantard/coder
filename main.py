@@ -189,10 +189,12 @@ class PythonEditor(QTextEdit):
             return
 
         if self.mode == 1:
+            if e.key() == Qt.Key_Down:
+                self.show_all_code()
 
-            if e.key() == Qt.Key_Control:
+            elif e.key() == Qt.Key_Control:
                 return
-            if e.key() == Qt.Key_End:
+            elif e.key() == Qt.Key_End:
                 while self.complete_line(False):
                     pass
                 self.set_mode(0)
@@ -506,7 +508,10 @@ class MainWindow(QMainWindow):
 
     def resizeEvent(self, a0):
         super().resizeEvent(a0)
-        self.toolbar.setGeometry(self.width() - 150, self.height() - 56, 140, 40)
+        if self. isFullScreen():
+            self.toolbar.setGeometry(self.width() - 150, self.height() - 34, 140, 40)
+        else:
+            self.toolbar.setGeometry(self.width() - 150, self.height() - 56, 140, 40)
 
     def clear_all(self):
         self.jupyter_widget.execute("%clear")
@@ -600,7 +605,8 @@ class MainWindow(QMainWindow):
 
 
     def code_from_slide(self, code):
-        self.text_edit.setText(autopep8.fix_code(code))
+        self.text_edit.set_code(code)
+        self.text_edit.set_mode(1)
         self.tabs.setCurrentIndex(0)
 
     def load_program(self, filename):

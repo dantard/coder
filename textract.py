@@ -310,7 +310,7 @@ class Slides(QWidget):
             self.code_buttons.append((play_button, code_pos))
             play_button.setToolTip(self.program)
 
-    def update_button_pos(self):
+    def update_button_pos(self, delta=0):
         image_x, image_y = self.get_image_pos()
         zoom = self.resized_pixmap.width() / self.pixmap.width() *4
 
