@@ -103,8 +103,9 @@ class PythonEditor(QTextEdit):
     def set_mode(self, mode):
         self.mode = mode
         self.setCursorWidth(3 if self.mode == 1 else 1)
-        self.setReadOnly(self.mode == 1)
+        #self.setReadOnly(self.mode == 1)
         self.update()
+
 
     def __init__(self, font_size=18):
         super().__init__()
@@ -181,7 +182,9 @@ class PythonEditor(QTextEdit):
             self.setText(autopep8.fix_code(self.code))
             self.set_mode(0)
 
+
     def keyPressEvent(self, e: QtGui.QKeyEvent) -> None:
+        self.setFocusPolicy(Qt.StrongFocus)
 
         if e.key() == Qt.Key_Escape:
             self.set_mode(1 if self.mode == 0 else 0)
@@ -191,7 +194,8 @@ class PythonEditor(QTextEdit):
         if self.mode == 1:
             if e.key() == Qt.Key_Down:
                 self.show_all_code()
-
+            elif e.text() == "º":
+                self.complete_line(True)
             elif e.key() == Qt.Key_Control:
                 return
             elif e.key() == Qt.Key_End:
@@ -353,8 +357,6 @@ class MainWindow(QMainWindow):
         self.text_edit.ctrl_enter.connect(self.execute_code)
         self.text_edit.info.connect(self.update_status_bar)
         self.text_edit.setPlaceholderText("Write Python code here...")
-        self.text_edit.installEventFilter(self)
-
 
         self.line_number_area = PythonEditor(self.font_size)
         self.line_number_area.setStyleSheet("QTextEdit { color: #a0a0a0;}")
@@ -367,7 +369,7 @@ class MainWindow(QMainWindow):
         bar.addAction("✕", self.clear_all)
         bar.addAction("⬇", self.text_edit.show_all_code)
 
-        self.keep_banner = bar.addAction("#")
+        self.keep_banner = bar.addAction("")
         self.keep_banner.setCheckable(True)
         self.keep_banner.setChecked(False)
 
@@ -457,13 +459,7 @@ class MainWindow(QMainWindow):
         q.activated.connect(self.open_slides)
 
         q = QShortcut("Ctrl+Tab", self)
-        q.activated.connect(lambda: self.tabs.setCurrentIndex((self.tabs.currentIndex() + 1)% self.tabs.count()))
-
-        q = QShortcut("F1", self)
-        q.activated.connect(lambda: self.text_edit.setFocus())
-
-        q = QShortcut("F2", self)
-        q.activated.connect(lambda: self.jupyter_widget._control.setFocus())
+        q.activated.connect(self.toggle_focus)
 
         def resize():
             splitter.setSizes([int(self.width() * 0.5), int(self.width() * 0.5)])
@@ -474,6 +470,25 @@ class MainWindow(QMainWindow):
 
         if self.config.get("fullscreen", False):
             self.toggle_fullscreen()
+
+    def toggle_focus(self):
+        if self.text_edit.hasFocus():
+            self.jupyter_widget._control.setFocus()
+        else:
+            self.text_edit.setFocus()
+
+
+
+    def keyPressEvent(self, a0):
+        if a0.key() == Qt.Key_F11:
+            self.toggle_fullscreen()
+        elif Qt.Key_F1 <= a0.key() <= Qt.Key_F10:
+            idx = a0.key() - Qt.Key_F1
+
+            if idx < self.tabs.count():
+                self.tabs.setCurrentIndex(idx)
+
+        super().keyPressEvent(a0)
 
     def save_as(self):
         filename, ok = QFileDialog.getSaveFileName(self, "Save code", filter="Python files (*.py)", directory="progs")
@@ -593,17 +608,6 @@ class MainWindow(QMainWindow):
             self.showFullScreen()
             self.menuBar().hide()
 
-
-    def eventFilter(self, source, event):
-        if event.type() == QEvent.KeyPress:  # Check if the event is a key press
-            if event.text() == "ñ":
-                #print(f"Key pressed2: {event.text()}")
-                return True
-            #else:
-                # print(f"Key pressed: {event.text()}")
-        return super().eventFilter(source, event)
-
-
     def code_from_slide(self, code):
         self.text_edit.set_code(code)
         self.text_edit.set_mode(1)
@@ -624,19 +628,8 @@ class MainWindow(QMainWindow):
 
 
     def execute_code(self):
-        self.jupyter_widget._control.setText("")
-        self.jupyter_widget._control.setFocus()
-        QApplication.processEvents()
-
-        def run():
-            code = self.text_edit.toPlainText()
-            if code.strip():
-                self.jupyter_widget.execute(code, interactive=True)
-                if not self.keep_banner.isChecked():
-                    self.jupyter_widget._control.clear()
-
-
-        QTimer.singleShot(100, run)
+        self.jupyter_widget.execute("%clear")
+        self.jupyter_widget.do_execute(self.text_edit.toPlainText(), True, False)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
