@@ -2,7 +2,7 @@ import os
 import random
 import sys
 import time
-import resources # noqa
+# import resources # noqa
 import yaml
 from PyQt5 import QtGui
 from PyQt5.QtWidgets import QApplication, QMainWindow, QSplitter, QTextEdit, QPushButton, QVBoxLayout, QWidget, \
@@ -18,12 +18,14 @@ import autopep8
 
 from utils import create_cursor_image
 
+
 class CustomTabBar(QTabBar):
     def __init__(self):
         super().__init__()
         # Customize the tab bar as needed
         self.setStyleSheet("QTabBar::tab { background: lightblue; }")
         self.a = QPushButton(self)
+
 
 class PythonHighlighter(QSyntaxHighlighter):
     def __init__(self, document):
@@ -38,10 +40,9 @@ class PythonHighlighter(QSyntaxHighlighter):
                     'break', 'while', 'await', 'async', 'range', 'is', 'True', 'lambda',
                     'False', 'in', 'import', 'except', 'continue', 'and', 'raise', 'with',
                     'if', 'try', 'for', 'else', 'not', 'def', 'danilo'
-                   ]
+                    ]
 
-
-        #print(set(keywords))
+        # print(set(keywords))
 
         self.highlighting_rules += [(f"\\b{k}\\b", keyword_format) for k in keywords]
 
@@ -78,7 +79,7 @@ def create_jupyter_widget(font_size):
     font.setPixelSize(font_size)
     jupyter_widget.font = font
 
-    #jupyter_widget._set_font()
+    # jupyter_widget._set_font()
     jupyter_widget.kernel_manager = kernel_manager
     jupyter_widget.kernel_client = kernel_client
 
@@ -87,7 +88,6 @@ def create_jupyter_widget(font_size):
     jupyter_widget.banner = ""  # Remove banner
     jupyter_widget.input_prompt = ""  # Remove input prompt
     jupyter_widget.output_prompt = ""  # Remove output prompt
-
 
     return jupyter_widget
 
@@ -103,9 +103,8 @@ class PythonEditor(QTextEdit):
     def set_mode(self, mode):
         self.mode = mode
         self.setCursorWidth(3 if self.mode == 1 else 1)
-        #self.setReadOnly(self.mode == 1)
+        # self.setReadOnly(self.mode == 1)
         self.update()
-
 
     def __init__(self, font_size=18):
         super().__init__()
@@ -121,14 +120,18 @@ class PythonEditor(QTextEdit):
         self.code = ""
         self.count = 0
 
+    def format_code(self):
+        self.setPlainText(autopep8.fix_code(self.toPlainText()))
+        self.moveCursor(QtGui.QTextCursor.End)
+
     def complete_line(self, sleep=True):
         self.info.emit(self.get_next_line(), 0)
         while self.count < len(self.code):
-            #self.setText(self.toPlainText() + self.code[self.count])
+            # self.setText(self.toPlainText() + self.code[self.count])
             self.insertPlainText(self.code[self.count])
             self.moveCursor(QtGui.QTextCursor.End)
             self.count += 1
-            if self.code[self.count-1] == "\n":
+            if self.code[self.count - 1] == "\n":
                 # if next line is empty continue
                 # and show that line too
                 if len(self.get_rest_of_line()) > 0:
@@ -143,9 +146,9 @@ class PythonEditor(QTextEdit):
         count = self.count
         text = ""
         while count < len(self.code):
-            text+= self.code[count]
+            text += self.code[count]
             count += 1
-            if self.code[count-1] == "\n":
+            if self.code[count - 1] == "\n":
                 return text[1:]
         return ""
 
@@ -182,7 +185,6 @@ class PythonEditor(QTextEdit):
             self.setText(autopep8.fix_code(self.code))
             self.set_mode(0)
 
-
     def keyPressEvent(self, e: QtGui.QKeyEvent) -> None:
         self.setFocusPolicy(Qt.StrongFocus)
 
@@ -203,9 +205,9 @@ class PythonEditor(QTextEdit):
                     pass
                 self.set_mode(0)
 
-            #elif e.key() == Qt.Key_Return:
-                #super().keyPressEvent(e)
-                #self.set_mode(0)
+            # elif e.key() == Qt.Key_Return:
+            # super().keyPressEvent(e)
+            # self.set_mode(0)
             #    pass
             elif e.key() == Qt.Key_Tab:
                 if e.modifiers() == Qt.ControlModifier:
@@ -223,9 +225,8 @@ class PythonEditor(QTextEdit):
             elif e.key() == Qt.Key_Backspace:
                 self.set_mode(0)
             else:
-                self.setText(self.toPlainText() +"\n")
+                self.setText(self.toPlainText() + "\n")
                 self.moveCursor(QtGui.QTextCursor.End)
-
 
         elif self.mode == 0:
 
@@ -250,7 +251,6 @@ class PythonEditor(QTextEdit):
                         self.insertPlainText("\n" + " " * (max(spaces - 4, 0)))
                 else:
                     super().keyPressEvent(e)
-
             else:
                 super().keyPressEvent(e)
 
@@ -264,12 +264,12 @@ class PythonEditor(QTextEdit):
         if remaining:
             return remaining[0]
 
+
 class DynamicComboBox(QComboBox):
-    def __init__(self, dir,  parent=None):
+    def __init__(self, dir, parent=None):
         super().__init__(parent)
         self.dir = dir
         self.addItem("Select program")
-
 
     def showPopup(self):
         self.populate()
@@ -284,11 +284,10 @@ class DynamicComboBox(QComboBox):
         self.addItems(files)
         self.blockSignals(False)
 
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-
-
 
         try:
             with open("config.yaml") as f:
@@ -316,7 +315,7 @@ class MainWindow(QMainWindow):
         self.toolbar.setMaximumHeight(35)
         self.toolbar.show()
 
-        none = self.toolbar.addAction("", lambda : self.set_writing_mode(0))
+        none = self.toolbar.addAction("", lambda: self.set_writing_mode(0))
         none.setIcon(QIcon(":/icons/cursor.svg"))
         none.setCheckable(True)
         none.setChecked(True)
@@ -325,18 +324,18 @@ class MainWindow(QMainWindow):
         pointer.setIcon(QIcon(":/icons/origin.svg"))
         pointer.setCheckable(True)
 
-        write = self.toolbar.addAction("", lambda : self.set_writing_mode(2))
+        write = self.toolbar.addAction("", lambda: self.set_writing_mode(2))
         write.setIcon(QIcon(":/icons/edit.svg"))
         write.setCheckable(True)
 
-        erase = self.toolbar.addAction("", lambda : self.set_writing_mode(3))
+        erase = self.toolbar.addAction("", lambda: self.set_writing_mode(3))
         erase.setIcon(QIcon(":/icons/delete.svg"))
         erase.setCheckable(True)
 
         erase_all = self.toolbar.addAction("", lambda: self.tabs.currentWidget().erase_all())
         erase_all.setIcon(QIcon("icons/bin.svg"))
 
-        self.group = [none, pointer,  write, erase]
+        self.group = [none, pointer, write, erase]
 
         self.toolbar.addSeparator()
         black = self.toolbar.addAction("", lambda: self.set_color(0))
@@ -369,7 +368,6 @@ class MainWindow(QMainWindow):
 
         next1 = self.toolbar.addAction("⬇", lambda: self.move_to(True))
         next1.setIcon(QIcon(":/icons/arrow-right.svg"))
-
 
         splitter = QSplitter(Qt.Horizontal)
 
@@ -412,7 +410,7 @@ class MainWindow(QMainWindow):
         lay.setContentsMargins(0, 0, 0, 0)
         lay.setSpacing(0)
 
-        #left_layout.addWidget(self.text_edit)
+        # left_layout.addWidget(self.text_edit)
         self.line_number_area.setReadOnly(True)
         self.line_number_area.setMaximumWidth(50)
         lay.addWidget(self.line_number_area)
@@ -433,14 +431,13 @@ class MainWindow(QMainWindow):
             text = ""
 
             for i in range(len(lines) + 1):
-                #self.line_number_area.append("{:3d}".format(i + 1))
+                # self.line_number_area.append("{:3d}".format(i + 1))
                 text += "{:3d}\n".format(i + 1)
             self.line_number_area.setPlainText(text)
 
-            #self.text_edit.setTextCursor(self.text_edit.textCursor())
+            # self.text_edit.setTextCursor(self.text_edit.textCursor())
             self.line_number_area.verticalScrollBar().setValue(v1)
             self.line_number_area.blockSignals(False)
-
 
         self.text_edit.textChanged.connect(text_changed)
         self.text_edit.verticalScrollBar().valueChanged.connect(self.line_number_area.verticalScrollBar().setValue)
@@ -493,8 +490,12 @@ class MainWindow(QMainWindow):
         q = QShortcut("Ctrl+Tab", self)
         q.activated.connect(self.toggle_focus)
 
+        q = QShortcut("Ctrl+F", self)
+        q.activated.connect(self.text_edit.format_code)
+
         def resize():
             splitter.setSizes([int(self.width() * 0.5), int(self.width() * 0.5)])
+
         QTimer.singleShot(100, resize)
 
         for elem in self.config.get("last", []):
@@ -524,7 +525,6 @@ class MainWindow(QMainWindow):
 
         self.tabs.currentWidget().set_writing_mode(mode)
 
-
     def keyPressEvent(self, a0):
         if a0.key() == Qt.Key_F11:
             self.toggle_fullscreen()
@@ -542,7 +542,6 @@ class MainWindow(QMainWindow):
             filename = filename.replace(".py", "") + ".py"
             with open(filename, "w") as f:
                 f.write(self.text_edit.toPlainText())
-
 
     def update_status_bar(self, x, timeout):
         if self.config.get("show_status_bar", True):
@@ -566,10 +565,12 @@ class MainWindow(QMainWindow):
 
     def resizeEvent(self, a0):
         super().resizeEvent(a0)
-        if self. isFullScreen():
-            self.toolbar.setGeometry(self.width() - self.toolbar.width() - 20, self.height() - 34, self.toolbar.width(), 40)
+        if self.isFullScreen():
+            self.toolbar.setGeometry(self.width() - self.toolbar.width() - 20, self.height() - 34, self.toolbar.width(),
+                                     40)
         else:
-            self.toolbar.setGeometry(self.width() - self.toolbar.width() - 20, self.height() - 56, self.toolbar.width(), 40)
+            self.toolbar.setGeometry(self.width() - self.toolbar.width() - 20, self.height() - 56, self.toolbar.width(),
+                                     40)
 
     def clear_all(self):
         self.jupyter_widget.execute("%clear")
@@ -584,12 +585,11 @@ class MainWindow(QMainWindow):
             self.text_edit.setFocus()
             self.toolbar.hide()
         else:
-#            self.tabs.currentWidget().image_label.setFocus()
+            #            self.tabs.currentWidget().image_label.setFocus()
             self.toolbar.show()
             self.action_touchable.blockSignals(True)
             self.action_touchable.setChecked(not self.tabs.currentWidget().touchable)
             self.action_touchable.blockSignals(False)
-
 
     def set_touchable(self):
         self.tabs.currentWidget().set_touchable(not self.action_touchable.isChecked())
@@ -601,7 +601,8 @@ class MainWindow(QMainWindow):
     def open_slides(self, filename=None, page=0):
         # open pdf file
         if filename is None:
-            filename, ok = QFileDialog.getOpenFileName(self, "Open PDF file", filter="PDF files (*.pdf)", directory="slides")
+            filename, ok = QFileDialog.getOpenFileName(self, "Open PDF file", filter="PDF files (*.pdf)",
+                                                       directory="slides")
 
         if filename:
             name = filename.split("/")[-1].replace(".pdf", "")
@@ -611,7 +612,6 @@ class MainWindow(QMainWindow):
                 self.tabs.addTab(slides, name)
                 self.tabs.setCurrentWidget(slides)
                 slides.view.setFocus()
-
 
     def closeEvent(self, a0):
         self.config["last"] = []
@@ -630,19 +630,23 @@ class MainWindow(QMainWindow):
         m1.setCheckable(True)
         m1.setChecked(self.isFullScreen())
         m1.triggered.connect(self.toggle_fullscreen)
-        m2 = menu.addMenu("Slides")
-        def fill():
-            pwd = os.getcwd()
-            for filename in os.listdir("slides"):
-                m2.addAction(filename, lambda x=filename, y=filename: self.open_slides(pwd + "/slides/" + y))
 
-        m2.aboutToShow.connect(fill)
+        if os.path.exists("slides"):
+            m2 = menu.addMenu("Slides")
+
+            def fill():
+                pwd = os.getcwd()
+                for filename in os.listdir("slides"):
+                    m2.addAction(filename, lambda x=filename, y=filename: self.open_slides(pwd + "/slides/" + y))
+
+            m2.aboutToShow.connect(fill)
+
         menu.addAction("Open", self.open_slides)
         menu.addSeparator()
         m3 = menu.addMenu("Mode")
-        m3.addAction("None", lambda : self.set_writing_mode(0))
-        m3.addAction("Write", lambda : self.set_writing_mode(1))
-        m3.addAction("Erase", lambda : self.set_writing_mode(2))
+        m3.addAction("None", lambda: self.set_writing_mode(0))
+        m3.addAction("Write", lambda: self.set_writing_mode(1))
+        m3.addAction("Erase", lambda: self.set_writing_mode(2))
         m3.addAction("Rectangles", lambda: self.set_writing_mode(3))
         m3.addAction("Ellipses", lambda: self.set_writing_mode(4))
 
@@ -669,17 +673,18 @@ class MainWindow(QMainWindow):
             return
 
         with open(f"progs/{filename}") as f:
-        #    self.text_edit.setPlainText(f.read())
+            #    self.text_edit.setPlainText(f.read())
             self.text_edit.set_code(f.read())
             self.text_edit.count = 0
             self.text_edit.clear()
             self.text_edit.setFocus()
             self.jupyter_widget.execute("%clear")
 
-
     def execute_code(self):
+        self.text_edit.format_code()
         self.jupyter_widget.execute("%clear")
         self.jupyter_widget.do_execute(self.text_edit.toPlainText(), True, False)
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
