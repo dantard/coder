@@ -1,0 +1,20 @@
+<!DOCTYPE RCC>
+<RCC version="1.0">
+        <qresource>
+        <file>icons/delete.svg</file>
+        <file>icons/arrow-right.svg</file>
+        <file>icons/cut.svg</file>
+        <file>icons/close.svg</file>
+        <file>icons/cursor.svg</file>
+        <file>icons/arrow-left.svg</file>
+        <file>icons/origin.svg</file>
+        <file>icons/pan.svg</file>
+        <file>icons/edit.svg</file>
+        <file>icons/red.svg</file>
+        <file>icons/black.svg</file>
+        <file>icons/green.svg</file>
+        <file>icons/blue.svg</file>
+        <file>icons/bin.svg</file>
+        </qresource>
+
+</RCC>

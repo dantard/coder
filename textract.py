@@ -6,89 +6,215 @@ import fitz  # PyMuPDF
 import sys
 
 import fitz  # PyMuPDF
-from PyQt5.QtCore import Qt, QTimer, pyqtSignal
-from PyQt5.QtGui import QPixmap, QImage, QFont, QPainter, QColor, QCursor, QIcon
+from PyQt5.QtCore import Qt, QTimer, pyqtSignal, QLine, QLineF, QRectF
+from PyQt5.QtGui import QPixmap, QImage, QFont, QPainter, QColor, QCursor, QIcon, QTransform, QPen
 from PyQt5.QtWidgets import QMainWindow, QLabel, QSizePolicy, QApplication, QVBoxLayout, QWidget, QPushButton, \
-    QShortcut, QInputDialog, QTabBar, QToolBar, QHBoxLayout, QComboBox
+    QShortcut, QInputDialog, QTabBar, QToolBar, QHBoxLayout, QComboBox, QGraphicsView, QGraphicsScene, QGraphicsPixmapItem, QGraphicsItem, QGraphicsEllipseItem, \
+    QGraphicsRectItem, QGraphicsProxyWidget
 from pymupdf import Rect
 
 from utils import create_cursor_image
+
+
+class Eraser(QGraphicsEllipseItem):
+    pass
+
+
+class GraphicsScene(QGraphicsScene):
+
+    NONE = 0
+    POINTER = 1
+    WRITING = 2
+    ERASING = 3
+    RECTANGLES = 4
+    ELLIPSES = 5
+
+    navigate = pyqtSignal(int)
+
+    def keyPressEvent(self, event):
+        print("key", event.key())
+        super().keyPressEvent(event)
+        if event.key() == Qt.Key_E:
+            self.status = GraphicsScene.ERASING
+        elif event.key() == Qt.Key_W:
+            self.status = GraphicsScene.WRITING
+        elif event.key() in [Qt.Key_Right, Qt.Key_Down]:
+            self.navigate.emit(1)
+        elif event.key() in [Qt.Key_Left, Qt.Key_Up]:
+            self.navigate.emit(-1)
+
+
+    def __init__(self):
+        super().__init__()
+        self.pixmap = QGraphicsPixmapItem()
+        self.pixmap.setTransformationMode(Qt.SmoothTransformation)  # Enable smooth transformation for the pixmap item
+
+        self.addItem(self.pixmap)
+        self.image = None
+        self.start = None
+        self.page = 0
+        self.status = GraphicsScene.NONE
+
+
+        self.gum = Eraser(0, 0, 100, 100, self.pixmap)
+        self.gum.setBrush(QColor(255, 255, 255))
+        self.gum.setPen(QPen(QColor(0, 0, 0), 2))
+        self.gum.setVisible(False)
+        self.drawings = {}
+        self.rectangle = None
+        self.color = QPen(Qt.black, 2)
+        # make the ellipse movable
+        #self.gum.setFlag(QGraphicsItem.ItemIsMovable)
+
+    def set_image(self, image, page):
+        current = self.drawings.get(self.page, [])
+        for item in current:
+            self.removeItem(item)
+
+        self.image = image
+        self.page = page
+        #self.resize_image(size)
+        self.pixmap.setPixmap(self.image)
+
+        for item in self.drawings.get(self.page, []):
+            self.addItem(item)
+
+
+
+    def mousePressEvent(self, event):
+        event.accept()
+        super().mousePressEvent(event)
+        if event.button() == Qt.RightButton:
+            return
+
+        self.start = event.scenePos()
+
+
+        # get objects at the click position
+        items = self.items(self.start)
+        for item in items:
+            if type(item) not in [QGraphicsPixmapItem, Eraser]:
+                self.start = None
+                return
+
+        if self.status == GraphicsScene.RECTANGLES:
+            self.rectangle = self.addRect(QRectF(self.start, self.start), self.color)
+
+        if self.status == GraphicsScene.ELLIPSES:
+            self.rectangle = self.addEllipse(QRectF(self.start, self.start), self.color)
+
+        if self.rectangle is not None:
+            self.rectangle.setFlag(QGraphicsItem.ItemIsMovable)
+            if self.drawings.get(self.page) is None:
+                self.drawings[self.page] = []
+            self.drawings[self.page].append(self.rectangle)
+
+
+
+
+    def mouseReleaseEvent(self, event):
+        super().mouseReleaseEvent(event)
+        self.start = None
+
+    def mouseMoveEvent(self, event):
+        super().mouseMoveEvent(event)
+        if self.status == GraphicsScene.WRITING:
+            if self.start is None:
+                return
+
+            line = self.addLine(QLineF(self.start, event.scenePos()), self.color)
+            if self.drawings.get(self.page) is None:
+                self.drawings[self.page] = []
+            self.drawings[self.page].append(line)
+
+            self.start = event.scenePos()
+
+        elif self.status == GraphicsScene.ERASING:
+            if self.start is not None:
+                self.gum.setPos(event.scenePos()-QLine(50, 50, 50, 50).p2())
+                for item in self.gum.collidingItems():
+                    if type(item) in [QGraphicsPixmapItem, QGraphicsProxyWidget]:
+                        continue
+                    if item in self.drawings.get(self.page, []):
+                        self.drawings[self.page].remove(item)
+                    self.removeItem(item)
+
+        elif self.status in [GraphicsScene.RECTANGLES, GraphicsScene.ELLIPSES]:
+            if self.start is None:
+                return
+            self.rectangle.setRect(QRectF(self.start, event.scenePos()))
+
+    def erase_all(self):
+        for item in self.drawings.get(self.page, []):
+            self.removeItem(item)
+        self.drawings[self.page] = []
+
+class GraphicsView(QGraphicsView):
+
+    def __init__(self, a):
+        super().__init__(a)
+        self.setRenderHint(QPainter.SmoothPixmapTransform)
+        self.setRenderHint(QPainter.Antialiasing)
+        self.setRenderHint(QPainter.TextAntialiasing)
+        self.setRenderHint(QPainter.HighQualityAntialiasing)
+        # self.scence = None
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        transf = QTransform()
+        ratio1 = self.viewport().size().width() / self.scene().image.width()
+        ratio2 = self.viewport().size().height() / self.scene().image.height()
+        ratio = min(ratio1, ratio2)
+        transf.scale(ratio, ratio)
+        self.setTransform(transf)
+        self.scene().setSceneRect(0, 0, self.scene().image.width(), self.scene().image.height())
+
+        #if self.scence is not None:
+        #    self.scene().removeItem(self.scence)
+        #self.scence = self.scene().addRect(self.sceneRect(), QColor(255, 0, 0))
+
+    def set_image(self, image, page):
+        self.scene().set_image(image, page)
 
 
 class Slides(QWidget):
 
     play_code = pyqtSignal(str)
 
+    def set_writing_mode(self, mode):
+        self.scene.status = mode
+        self.scene.gum.setVisible(mode == GraphicsScene.ERASING)
+        if mode == GraphicsScene.POINTER:
+            self.view.setCursor(QCursor(create_cursor_image()))
+        else:
+            self.view.setCursor(Qt.ArrowCursor)
+
+
+    def set_color(self, color):
+        colors = [Qt.black, Qt.red, Qt.green, Qt.blue, Qt.yellow, Qt.magenta, Qt.cyan, Qt.gray]
+        self.scene.color = QPen(colors[color], 2)
+
+    def erase_all(self):
+        self.scene.erase_all()
 
     def __init__(self, pdf_path, page):
         super().__init__()
 
         self.touchable = True
-        self.cursor_image = create_cursor_image()
         self.program = ""
         self.code_buttons = []
         self.code_line_height = 0
         self.resized_pixmap = None
         self.doc = fitz.open(pdf_path)
         self.filename = pdf_path
-
         self.page = page
 
-        self.setWindowTitle("Resizable Image")
-
         # Create a QLabel to display the image
-        self.image_label = QLabel(self)
-        self.image_label.setAlignment(Qt.AlignCenter)
-        self.image_label.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
-
-        # Load the initial pixmap
-
-        self.pixmap = None
-
-        # self.play_button = QPushButton(self.image_label)
-        # self.play_button.setIcon(self.style().standardIcon(QApplication.style().SP_MediaPlay))
-        # self.play_button.setVisible(False)
-        # #self.play_button.setFlat(True)
-        # #self.play_button.setStyleSheet("font-size: 16px; background-color: white; border: 1px solid black;")
-        # self.play_button.clicked.connect(self.play_program)
-
-        a1 = QPushButton()
-        a1.setIcon(self.style().standardIcon(QApplication.style().SP_ArrowForward))
-        a1.setFixedSize(40,40)
-        a1.setFlat(True)
-        a1.clicked.connect(lambda: self.move_to(True))
-
-
-        a2 = QPushButton()
-        a2.setIcon(self.style().standardIcon(QApplication.style().SP_ArrowBack))
-        a2.setFixedSize(40,40)
-        a2.setFlat(True)
-        a2.clicked.connect(lambda: self.move_to(False))
-
-        a3 = QPushButton()
-        a3.setIcon(QIcon(self.cursor_image))
-        a3.setFixedSize(40, 40)
-        a3.setFlat(True)
-        a3.clicked.connect(lambda: self.toggle_cursor())
-
-        a0 = QWidget()
-        a0.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Expanding)
-        a9 = QWidget()
-        a9.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-
-        buttons_vertical_layout = QVBoxLayout()
-        buttons_vertical_layout.setSpacing(0)
-        buttons_vertical_layout.addWidget(a0)
-        buttons_vertical_layout.addWidget(a1)
-        buttons_vertical_layout.addWidget(a3)
-        buttons_vertical_layout.addWidget(a2)
-
-        # self.cmd_bar.layout().addWidget(a0)
-        # self.cmd_bar.layout().addWidget(a2)
-        # self.cmd_bar.layout().addWidget(a3)
-
-
-
+        self.scene = GraphicsScene()
+        self.scene.navigate.connect(self.navigate)
+        self.view = GraphicsView(self.scene)
+        self.view.setAlignment(Qt.AlignCenter)
+        self.view.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
 
         # add shortcut ctrl+n to number of page
         def get_number_of_page():
@@ -102,16 +228,7 @@ class Slides(QWidget):
         # Set up a layout
         layout = QHBoxLayout()
         layout.setSpacing(0)
-        layout.addWidget(self.image_label)
-        #layout.addLayout(buttons_vertical_layout)
-
-
-
-
-        # Create a central widget
-        #container = QWidget()
-        #container.setLayout(layout)
-        #self.setCentralWidget(container)
+        layout.addWidget(self.view)
 
         self.setLayout(layout)
         self.update_image()
@@ -126,6 +243,10 @@ class Slides(QWidget):
                         border: 1px solid #ffffff;
                     }
                 """)
+
+    def navigate(self, delta):
+        self.page = (self.page + delta) % len(self.doc)
+        self.update_image()
 
     def play_program(self, program):
         #print(program)
@@ -151,14 +272,6 @@ class Slides(QWidget):
                 f"python -c \"{self.program}\""
             ])
 
-
-
-    def set_custom_cursor(self, what):
-        cursor = QCursor(self.cursor_image, 30 // 2, 30 // 2)  # Set the hotspot in the center
-
-        # Set the custom cursor for the entire application
-        what.setCursor(cursor)
-
     def set_touchable(self, touchable):
         self.touchable = touchable
 
@@ -167,8 +280,11 @@ class Slides(QWidget):
         if a0.button() == Qt.RightButton:
             return
 
+        if self.scene.status != GraphicsScene.NONE:
+            return
+
         if self.touchable:
-            right_side = a0.x() > self.image_label.width() // 2
+            right_side = a0.x() > self.view.width() // 2
             self.move_to(right_side)
 
 
@@ -181,25 +297,26 @@ class Slides(QWidget):
         self.update_image()
 
     def toggle_cursor(self):
-        if self.image_label.cursor().shape() == Qt.ArrowCursor:
-            self.set_custom_cursor(self.image_label)
+        if self.view.cursor() == Qt.ArrowCursor:
+            self.set_custom_cursor(self.view)
         else:
-            self.image_label.setCursor(Qt.ArrowCursor)
-        self.image_label.update()
+            self.view.setCursor(Qt.ArrowCursor)
+        self.view.update()
 
 
 
     def update_image(self):
         page = self.doc[self.page]
 
-        pix = self.doc[self.page].get_pixmap(matrix=fitz.Matrix(4, 4), alpha=False, annots=True)
+        pix = self.doc[self.page].get_pixmap(matrix=fitz.Matrix(2, 2), alpha=False, annots=True)
         image = QImage(pix.samples, pix.width, pix.height, pix.stride, QImage.Format_RGB888)
         self.pixmap = QPixmap(image)  # QPixmap("/home/danilo/Pictures/aaa.png")
-        self.image_label.setPixmap(self.pixmap)
+#        self.image_label.setPixmap(self.pixmap)
         self.resize_image()
+        self.view.set_image(self.pixmap, self.page)
 
         for button, _ in self.code_buttons:
-            button.deleteLater()
+            self.scene.removeItem(button)
         self.code_buttons.clear()
 
         for d in page.get_drawings():
@@ -226,34 +343,11 @@ class Slides(QWidget):
         # Resize the pixmap to fit the QLabel while maintaining aspect ratio
         if not self.pixmap is None and not self.pixmap.isNull():
             self.resized_pixmap = self.pixmap.scaled(
-                self.image_label.size(),
+                self.view.size(),
                 Qt.KeepAspectRatio,
                 Qt.SmoothTransformation
             )
 
-            self.image_label.setPixmap(self.resized_pixmap)
-            self.update_button_pos()
-
-
-    def keyPressEvent(self, a0):
-        super().keyPressEvent(a0)
-        if a0.key() == Qt.Key_Right or a0.key() == Qt.Key_Up:
-            self.page = (self.page + 1) % len(self.doc)
-            self.update_image()
-        elif a0.key() == Qt.Key_Left or a0.key() == Qt.Key_Down:
-            self.page = (self.page - 1) % len(self.doc)
-            self.update_image()
-
-    def get_image_pos(self):
-        pix = self.image_label.pixmap()
-        label_width, label_height = self.image_label.width(), self.image_label.height()
-        pixmap_width, pixmap_height = pix.width(), pix.height()
-
-        # If image is centered, the position of the image would be the difference
-        x_pos = (label_width - pixmap_width) // 2
-        y_pos = (label_height - pixmap_height) // 2
-
-        return x_pos, y_pos
 
     def extract_text_and_fonts(self, rect=None):
         lines = []
@@ -303,37 +397,23 @@ class Slides(QWidget):
 
             code_pos = (rect.x0, rect.y0, rect.x1 - rect.x0, rect.y1 - rect.y0)
 
-            play_button = QPushButton(self.image_label)
+            play_button = QPushButton()
+            play_button.setFixedSize(45, 45)
             play_button.setIcon(self.style().standardIcon(QApplication.style().SP_MediaPlay))
             play_button.clicked.connect(lambda x=program, y=program: self.play_program(y))
 
-            self.code_buttons.append((play_button, code_pos))
+            proxy = QGraphicsProxyWidget(self.scene.pixmap)
+            proxy.setWidget(play_button)
+
+            # Add the proxy widget to the scene
+            #self.scene.addItem(proxy)
+
+            self.code_buttons.append((proxy, code_pos))
             play_button.setToolTip(self.program)
 
-    def update_button_pos(self, delta=0):
-        image_x, image_y = self.get_image_pos()
-        zoom = self.resized_pixmap.width() / self.pixmap.width() *4
+    def update_button_pos(self):
 
         for button, code_pos in self.code_buttons:
             code_x, code_y, code_w, code_h = code_pos
-
-            button.setGeometry(int(image_x + (code_x + code_w)*zoom-25),
-                                         int(image_y + (code_y + code_h)*zoom-25),
-                                         26, 26)
-            button.setVisible(True)
-            #print("wtf ", button.geometry())
-
-# app = QApplication(sys.argv)
-# window = Slides("/home/danilo/Downloads/aaa.pdf")
-# window.setMinimumSize(800, 600)
-# window.show()
-# sys.exit(app.exec_())
-#
-#
-#
-# # Path to the PDF file
-# pdf_path = sys.argv[1]  # Replace with your PDF file path
-#
-# # Call the function
-# extract_text_and_fonts(pdf_path)
-
+            button: QGraphicsRectItem
+            button.setPos((code_x + code_w)*2-button.sceneBoundingRect().width(), (code_y + code_h)*2-button.sceneBoundingRect().height())

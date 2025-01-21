@@ -2,7 +2,7 @@ import os
 import random
 import sys
 import time
-
+import resources # noqa
 import yaml
 from PyQt5 import QtGui
 from PyQt5.QtWidgets import QApplication, QMainWindow, QSplitter, QTextEdit, QPushButton, QVBoxLayout, QWidget, \
@@ -313,33 +313,65 @@ class MainWindow(QMainWindow):
         tab_bar = self.tabs.tabBar()
 
         self.toolbar = QToolBar(self.tabs)
-        prev = self.toolbar.addAction("✕", lambda : self.move_to(False))
-        prev.setIcon(self.style().standardIcon(QApplication.style().SP_ArrowBack))
+        self.toolbar.setMaximumHeight(35)
+        self.toolbar.show()
+
+        none = self.toolbar.addAction("", lambda : self.set_writing_mode(0))
+        none.setIcon(QIcon(":/icons/cursor.svg"))
+        none.setCheckable(True)
+        none.setChecked(True)
+
+        pointer = self.toolbar.addAction("Pointer", lambda: self.set_writing_mode(1))
+        pointer.setIcon(QIcon(":/icons/origin.svg"))
+        pointer.setCheckable(True)
+
+        write = self.toolbar.addAction("", lambda : self.set_writing_mode(2))
+        write.setIcon(QIcon(":/icons/edit.svg"))
+        write.setCheckable(True)
+
+        erase = self.toolbar.addAction("", lambda : self.set_writing_mode(3))
+        erase.setIcon(QIcon(":/icons/delete.svg"))
+        erase.setCheckable(True)
+
+        erase_all = self.toolbar.addAction("", lambda: self.tabs.currentWidget().erase_all())
+        erase_all.setIcon(QIcon("icons/bin.svg"))
+
+        self.group = [none, pointer,  write, erase]
+
+        self.toolbar.addSeparator()
+        black = self.toolbar.addAction("", lambda: self.set_color(0))
+        black.setIcon(QIcon(":/icons/black.svg"))
+        red = self.toolbar.addAction("", lambda: self.set_color(1))
+        red.setIcon(QIcon(":/icons/red.svg"))
+        green = self.toolbar.addAction("", lambda: self.set_color(2))
+        green.setIcon(QIcon(":/icons/green.svg"))
+        blue = self.toolbar.addAction("", lambda: self.set_color(3))
+        blue.setIcon(QIcon(":/icons/blue.svg"))
+
+        self.color_group = [black, red, green, blue]
+        for elem in self.color_group:
+            elem.setCheckable(True)
+        black.setChecked(True)
+
+        self.toolbar.addSeparator()
+
+        prev = self.toolbar.addAction("✕", lambda: self.move_to(False))
+        prev.setIcon(QIcon(":/icons/arrow-left.svg"))
         # set color black and alhpa 0.5
-        self.toolbar.setStyleSheet("background-color:  rgba(0, 0, 0, 0.1);")
+        # self.toolbar.setStyleSheet("background-color:  rgba(0, 0, 0, 0.1);")
         self.toolbar.setMovable(True)
         self.toolbar.setFloatable(True)
         self.tabs.setStyleSheet("QTabBar::tab { height: 35px; }");
 
-
-
-        pointer = self.toolbar.addAction("Pointer", self.set_pointer)
-        pointer.setIcon(QIcon(create_cursor_image(25)))
-
         self.action_touchable = self.toolbar.addAction("Pointer", self.set_touchable)
         self.action_touchable.setCheckable(True)
-        self.action_touchable.setIcon(self.style().standardIcon(QApplication.style().SP_BrowserStop))
+        self.action_touchable.setIcon(QIcon(":/icons/pan.svg"))
 
-
-
-        next1 = self.toolbar.addAction("⬇", lambda : self.move_to(True))
-        next1.setIcon(self.style().standardIcon(QApplication.style().SP_ArrowForward))
-        self.toolbar.setMaximumHeight(35)
-        self.toolbar.show()
+        next1 = self.toolbar.addAction("⬇", lambda: self.move_to(True))
+        next1.setIcon(QIcon(":/icons/arrow-right.svg"))
 
 
         splitter = QSplitter(Qt.Horizontal)
-
 
         self.prog_cb = DynamicComboBox("progs")
 
@@ -471,12 +503,26 @@ class MainWindow(QMainWindow):
         if self.config.get("fullscreen", False):
             self.toggle_fullscreen()
 
+    def set_color(self, color):
+        for i, elem in enumerate(self.color_group):
+            elem.blockSignals(True)
+            elem.setChecked(i == color)
+            elem.blockSignals(False)
+        self.tabs.currentWidget().set_color(color)
+
     def toggle_focus(self):
         if self.text_edit.hasFocus():
             self.jupyter_widget._control.setFocus()
         else:
             self.text_edit.setFocus()
 
+    def set_writing_mode(self, mode):
+        for i, elem in enumerate(self.group):
+            elem.blockSignals(True)
+            elem.setChecked(i == mode)
+            elem.blockSignals(False)
+
+        self.tabs.currentWidget().set_writing_mode(mode)
 
 
     def keyPressEvent(self, a0):
@@ -515,18 +561,15 @@ class MainWindow(QMainWindow):
             else:
                 self.sb.setStyleSheet("color: black")
 
-    def set_pointer(self):
-        self.tabs.currentWidget().toggle_cursor()
-
     def move_to(self, forward):
         self.tabs.currentWidget().move_to(forward)
 
     def resizeEvent(self, a0):
         super().resizeEvent(a0)
         if self. isFullScreen():
-            self.toolbar.setGeometry(self.width() - 150, self.height() - 34, 140, 40)
+            self.toolbar.setGeometry(self.width() - self.toolbar.width() - 20, self.height() - 34, self.toolbar.width(), 40)
         else:
-            self.toolbar.setGeometry(self.width() - 150, self.height() - 56, 140, 40)
+            self.toolbar.setGeometry(self.width() - self.toolbar.width() - 20, self.height() - 56, self.toolbar.width(), 40)
 
     def clear_all(self):
         self.jupyter_widget.execute("%clear")
@@ -541,7 +584,7 @@ class MainWindow(QMainWindow):
             self.text_edit.setFocus()
             self.toolbar.hide()
         else:
-            self.tabs.currentWidget().image_label.setFocus()
+#            self.tabs.currentWidget().image_label.setFocus()
             self.toolbar.show()
             self.action_touchable.blockSignals(True)
             self.action_touchable.setChecked(not self.tabs.currentWidget().touchable)
@@ -567,7 +610,7 @@ class MainWindow(QMainWindow):
                 slides.play_code.connect(self.code_from_slide)
                 self.tabs.addTab(slides, name)
                 self.tabs.setCurrentWidget(slides)
-                slides.image_label.setFocus()
+                slides.view.setFocus()
 
 
     def closeEvent(self, a0):
@@ -596,6 +639,13 @@ class MainWindow(QMainWindow):
         m2.aboutToShow.connect(fill)
         menu.addAction("Open", self.open_slides)
         menu.addSeparator()
+        m3 = menu.addMenu("Mode")
+        m3.addAction("None", lambda : self.set_writing_mode(0))
+        m3.addAction("Write", lambda : self.set_writing_mode(1))
+        m3.addAction("Erase", lambda : self.set_writing_mode(2))
+        m3.addAction("Rectangles", lambda: self.set_writing_mode(3))
+        m3.addAction("Ellipses", lambda: self.set_writing_mode(4))
+
         menu.addAction("Exit", self.close)
 
         menu.exec_(event.globalPos())
