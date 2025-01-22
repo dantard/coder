@@ -15,6 +15,11 @@
         <file>icons/green.svg</file>
         <file>icons/blue.svg</file>
         <file>icons/bin.svg</file>
+        <file>icons/download.svg</file>
+        <file>icons/hash.svg</file>
+        <file>icons/play.svg</file>
+        <file>icons/refresh.svg</file>
+
         </qresource>
 
 </RCC>

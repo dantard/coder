@@ -3,17 +3,17 @@ import random
 import re
 import sys
 import time
-
-from pygments.lexers.srcinfo import keywords
+import typing
 
 import resources # noqa
 import yaml
-from PyQt5 import QtGui
+from PyQt5 import QtGui, QtCore
 from PyQt5.QtWidgets import QApplication, QMainWindow, QSplitter, QTextEdit, QPushButton, QVBoxLayout, QWidget, \
     QToolBar, QComboBox, QTabWidget, QMenu, QMenuBar, QFileDialog, QShortcut, QTabBar, QStatusBar, QHBoxLayout, \
     QPlainTextEdit
 from PyQt5.QtCore import Qt, QRegExp, pyqtSignal, QTimer, QEvent
-from PyQt5.QtGui import QTextCharFormat, QColor, QFont, QSyntaxHighlighter, QPixmap, QPainter, QCursor, QIcon, QTextCursor
+from PyQt5.QtGui import QTextCharFormat, QColor, QFont, QSyntaxHighlighter, QPixmap, QPainter, QCursor, QIcon, \
+    QTextCursor, QImage
 from qtconsole.rich_jupyter_widget import RichJupyterWidget
 from qtconsole.manager import QtKernelManager
 
@@ -94,7 +94,6 @@ def create_jupyter_widget(font_size):
     jupyter_widget.banner = ""  # Remove banner
     jupyter_widget.input_prompt = ""  # Remove input prompt
     jupyter_widget.output_prompt = ""  # Remove output prompt
-
     return jupyter_widget
 
 
@@ -349,7 +348,6 @@ class PythonEditor(QTextEdit):
         if remaining:
             return remaining[0]
 
-
 class DynamicComboBox(QComboBox):
     def __init__(self, dir, parent=None):
         super().__init__(parent)
@@ -483,9 +481,11 @@ class MainWindow(QMainWindow):
 
 
         bar = QToolBar()
-        bar.addAction("▶", self.execute_code)
-        bar.addAction("✕", self.clear_all)
-        bar.addAction("⬇", self.text_edit.show_all_code)
+        a1 = bar.addAction("▶", self.execute_code)
+
+        a2 = bar.addAction("✕", self.clear_all)
+
+        a3 = bar.addAction("⬇", self.text_edit.show_all_code)
 
         self.keep_banner = bar.addAction("#")
         self.keep_banner.setCheckable(True)
@@ -535,10 +535,15 @@ class MainWindow(QMainWindow):
         left_layout.addLayout(lay)
 
         self.sb = QStatusBar()
-        left_layout.addWidget(self.sb)
+        if self.config.get("show_status_bar", False):
+            left_layout.addWidget(self.sb)
 
         # left_layout.addWidget(self.run_button)
         left_widget.setLayout(left_layout)
+        left_layout.setSpacing(0)
+        lay.setSpacing(0)
+        lay.setContentsMargins(0, 0, 0, 0)
+        left_layout.setContentsMargins(0, 0, 0, 0)
 
         splitter.addWidget(left_widget)
 
@@ -591,6 +596,54 @@ class MainWindow(QMainWindow):
 
         if self.config.get("fullscreen", False):
             self.toggle_fullscreen()
+
+        if self.config.get("dark", True):
+            self.jupyter_widget.set_default_style(colors='linux')
+            self.text_edit.setStyleSheet("background-color: #000000; color: white")
+            self.line_number_area.setStyleSheet("background-color: #000000; color: white")
+            QApplication.instance().setStyleSheet("""
+                    QWidget {
+                        background-color: #121212; /* Dark background */
+                        color: #ffffff;          /* White text */
+                    }""")
+            color = "white"
+        else:
+            color = "black"
+
+        a1.setIcon(QIcon(self.color(":/icons/play.svg", color)))
+        a2.setIcon(QIcon(self.color(":/icons/refresh.svg", color)))
+        a3.setIcon(QIcon(self.color(":/icons/download.svg", color)))
+        self.keep_banner.setIcon(QIcon(self.color(":/icons/hash.svg", color)))
+
+    def color(self, icon_path, color):
+        # Load the pixmap from the icon path
+        pixmap = QPixmap(icon_path)
+
+        # Create an empty QPixmap with the same size
+        colored_pixmap = QPixmap(pixmap.size())
+        colored_pixmap.fill(Qt.transparent)
+
+        # Paint the new color onto the QPixmap
+        painter = QPainter(colored_pixmap)
+        painter.drawPixmap(0, 0, pixmap)
+        painter.setCompositionMode(QPainter.CompositionMode_SourceIn)
+        painter.fillRect(colored_pixmap.rect(), QColor(color))
+        painter.end()
+        return colored_pixmap
+    def color2(self, icon_path, target_color="white"):
+        # Load the icon as a QImage
+        image = QImage(icon_path)
+
+        # Iterate through each pixel to recolor black pixels
+        for y in range(image.height()):
+            for x in range(image.width()):
+                color = QColor(image.pixel(x, y))
+                if color.red() == 0 and color.green() == 0 and color.blue() == 0:  # Black pixel
+                    image.setPixelColor(x, y, QColor(target_color))
+
+        # Convert back to QPixmap
+        pixmap = QPixmap.fromImage(image)
+        return pixmap
 
     def set_color(self, color):
         for i, elem in enumerate(self.color_group):
