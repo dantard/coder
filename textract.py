@@ -23,7 +23,7 @@ class Eraser(QGraphicsEllipseItem):
 
 
 def smooth_with_savgol(points, window_size=5, poly_order=2):
-    if len(points) < window_size < 2 * poly_order + 1:
+    if len(points) < window_size:
         return points
     x = [p[0] for p in points]
     y = [p[1] for p in points]
@@ -133,6 +133,7 @@ class GraphicsScene(QGraphicsScene):
 
         for line in self.handwriting:
             self.removeItem(line)
+
 
         if len(smoothed) > 0:
             p1 = smoothed[0]
