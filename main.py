@@ -149,7 +149,10 @@ class PythonEditor(QTextEdit):
         self.count = 0
 
     def format_code(self):
-        self.setPlainText(autopep8.fix_code(self.toPlainText()))
+        code = self.toPlainText()
+        if not code.endswith("\n"):
+            code += "\n"
+        self.setPlainText(autopep8.fix_code(code))
         self.moveCursor(QtGui.QTextCursor.End)
 
     def complete_line(self, sleep=True):
@@ -309,7 +312,7 @@ class PythonEditor(QTextEdit):
             self.moveCursor(QtGui.QTextCursor.End)
             return
 
-        if len(current_line) > 0 and current_line[-1] in " (:":
+        if len(current_line) > 0 and current_line[-1] in " (:)":
             self.choosing = None
             return
 
@@ -322,9 +325,15 @@ class PythonEditor(QTextEdit):
 
         words = re.split(r'\W+', self.toPlainText())
 
+
         if len(words) == 0:
             return
+
         last_word = words[-1]
+
+        if last_word == "":
+            return
+
 
         keywords = list(set(PythonHighlighter.keywords + words))
         if "" in keywords:
@@ -390,7 +399,7 @@ class MainWindow(QMainWindow):
 
         self.setWindowTitle("Fancy Slides")
 
-        self.resize(1000, 600)
+        #self.resize(1000, 600)
 
         self.tabs = QTabWidget()
 
@@ -448,8 +457,8 @@ class MainWindow(QMainWindow):
         prev.setIcon(QIcon(":/icons/arrow-left.svg"))
         # set color black and alhpa 0.5
         # self.toolbar.setStyleSheet("background-color:  rgba(0, 0, 0, 0.1);")
-        self.toolbar.setMovable(True)
-        self.toolbar.setFloatable(True)
+        #self.toolbar.setMovable(True)
+        #self.toolbar.setFloatable(True)
         self.tabs.setStyleSheet("QTabBar::tab { height: 35px; }");
 
         self.action_touchable = self.toolbar.addAction("Pointer", self.set_touchable)
@@ -481,8 +490,8 @@ class MainWindow(QMainWindow):
 
         self.line_number_area = PythonEditor(self.font_size)
         self.line_number_area.setStyleSheet("QTextEdit { color: #a0a0a0;}")
-        self.line_number_area.setContentsMargins(0, 0, 0, 0)
-        self.text_edit.setContentsMargins(0, 0, 0, 0)
+        #self.line_number_area.setContentsMargins(0, 0, 0, 0)
+        #self.text_edit.setContentsMargins(0, 0, 0, 0)
 
         self.text_edit.cursorPositionChanged.connect(lambda: self.line_number_area.highlight_line( self.text_edit.textCursor().blockNumber()))
 
@@ -502,8 +511,8 @@ class MainWindow(QMainWindow):
         left_layout.addWidget(self.prog_cb)
 
         lay = QHBoxLayout()
-        lay.setContentsMargins(0, 0, 0, 0)
-        lay.setSpacing(0)
+        #lay.setContentsMargins(0, 0, 0, 0)
+        #lay.setSpacing(0)
 
         # left_layout.addWidget(self.text_edit)
         self.line_number_area.setReadOnly(True)
@@ -547,9 +556,10 @@ class MainWindow(QMainWindow):
 
         # left_layout.addWidget(self.run_button)
         left_widget.setLayout(left_layout)
-        left_layout.setSpacing(0)
+
         lay.setSpacing(0)
         lay.setContentsMargins(0, 0, 0, 0)
+        left_layout.setSpacing(0)
         left_layout.setContentsMargins(0, 0, 0, 0)
 
         splitter.addWidget(left_widget)
@@ -560,7 +570,14 @@ class MainWindow(QMainWindow):
 
         self.tabs.addTab(splitter, "Code Execution")
         tab_bar.setTabButton(0, QTabBar.ButtonPosition.RightSide, None)
-        self.setCentralWidget(self.tabs)
+        helper = QWidget()
+        helper.setContentsMargins(0,0,0,0)
+        helper.setLayout(QVBoxLayout())
+        helper.layout().setContentsMargins(0, 0, 0, 0)
+        helper.layout().setSpacing(0)
+        helper.layout().addWidget(self.tabs)
+        #helper.layout().addWidget(QStatusBar())
+        self.setCentralWidget(helper)
 
         file = self.menuBar()
         file = file.addMenu("File")
@@ -621,6 +638,7 @@ class MainWindow(QMainWindow):
         a2.setIcon(QIcon(self.color(":/icons/refresh.svg", color)))
         a3.setIcon(QIcon(self.color(":/icons/download.svg", color)))
         self.keep_banner.setIcon(QIcon(self.color(":/icons/hash.svg", color)))
+        QTimer.singleShot(100, self.update_toolbar_position)
 
     def color(self, icon_path, color):
         # Load the pixmap from the icon path
@@ -713,12 +731,17 @@ class MainWindow(QMainWindow):
 
     def resizeEvent(self, a0):
         super().resizeEvent(a0)
+        self.update_toolbar_position()
+
+    def update_toolbar_position(self):
+
         if self.isFullScreen():
-            self.toolbar.setGeometry(self.width() - self.toolbar.width() - 20, self.height() - 34, self.toolbar.width(),
+            self.toolbar.setGeometry(self.width() - self.toolbar.sizeHint().width() - 20, self.height() - 34, self.toolbar.sizeHint().width(),
                                      40)
         else:
-            self.toolbar.setGeometry(self.width() - self.toolbar.width() - 20, self.height() - 56, self.toolbar.width(),
+            self.toolbar.setGeometry(self.width() - self.toolbar.sizeHint().width() - 20, self.height() - 56, self.toolbar.sizeHint().width(),
                                      40)
+        print("update_toolbar_position", self.toolbar.geometry(), self.toolbar.sizeHint().width())
 
     def clear_all(self):
         self.jupyter_widget.execute("%clear")
@@ -760,6 +783,7 @@ class MainWindow(QMainWindow):
                 self.tabs.addTab(slides, name)
                 self.tabs.setCurrentWidget(slides)
                 slides.view.setFocus()
+                self.update_toolbar_position()
 
     def closeEvent(self, a0):
         self.config["last"] = []
@@ -839,7 +863,15 @@ class MainWindow(QMainWindow):
 
     def execute_code(self):
         self.text_edit.format_code()
-        self.jupyter_widget._control.setText("")
+        print(self.jupyter_widget._control.toPlainText())
+        #self.jupyter_widget._control.setText("")
+        def ddd():
+            text = self.jupyter_widget._control.toPlainText()
+            if  text.endswith("   ...: "):
+                if not self.keep_banner.isChecked():
+                    self.jupyter_widget._control.clear()
+
+        self.jupyter_widget._control.textChanged.connect(ddd)
         #self.jupyter_widget._control.setFocus()
         QApplication.processEvents()
 
@@ -847,8 +879,8 @@ class MainWindow(QMainWindow):
             code = self.text_edit.toPlainText()
             if code.strip():
                 self.jupyter_widget.execute(code, interactive=True)
-                if not self.keep_banner.isChecked():
-                    self.jupyter_widget._control.clear()
+                #if not self.keep_banner.isChecked():
+                #    self.jupyter_widget._control.clear()
 
         QTimer.singleShot(100, run)
 

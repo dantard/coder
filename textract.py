@@ -56,6 +56,7 @@ class GraphicsScene(QGraphicsScene):
 
     def __init__(self):
         super().__init__()
+        self.handwriting = []
         self.pixmap = QGraphicsPixmapItem()
         self.pixmap.setTransformationMode(Qt.SmoothTransformation)  # Enable smooth transformation for the pixmap item
 
@@ -104,42 +105,19 @@ class GraphicsScene(QGraphicsScene):
                 return
 
         if self.status == GraphicsScene.WRITING:
-            self.handwriting = []
+            self.handwriting.clear()
 
-        if self.status == GraphicsScene.RECTANGLES:
+        elif self.status == GraphicsScene.RECTANGLES:
             self.rectangle = self.addRect(QRectF(self.start, self.start), self.color)
 
-        if self.status == GraphicsScene.ELLIPSES:
+        elif self.status == GraphicsScene.ELLIPSES:
             self.rectangle = self.addEllipse(QRectF(self.start, self.start), self.color)
 
         if self.rectangle is not None:
             self.rectangle.setFlag(QGraphicsItem.ItemIsMovable)
-            if self.drawings.get(self.page) is None:
+            if self.drawings.get(self.page, None) is None:
                 self.drawings[self.page] = []
             self.drawings[self.page].append(self.rectangle)
-
-    def mouseReleaseEvent(self, event):
-        super().mouseReleaseEvent(event)
-        self.start = None
-        if self.status == GraphicsScene.WRITING:
-            self.smooth_handwriting()
-
-    def smooth_handwriting(self):
-        points = []
-        for p in self.handwriting:  # type: QGraphicsLineItem
-            points.append((p.line().x1(), p.line().y1()))
-
-        smoothed = smooth_with_savgol(points, 20, 4)
-
-        for line in self.handwriting:
-            self.removeItem(line)
-
-
-        if len(smoothed) > 0:
-            p1 = smoothed[0]
-            for p2 in smoothed:
-                self.addLine(QLineF(QPointF(*p1), QPointF(*p2)), self.color)
-                p1 = p2
 
     def mouseMoveEvent(self, event):
         super().mouseMoveEvent(event)
@@ -148,26 +126,58 @@ class GraphicsScene(QGraphicsScene):
                 return
 
             line = self.addLine(QLineF(self.start, event.scenePos()), self.color)
-            # if self.drawings.get(self.page) is None:
-            #    self.drawings[self.page] = []
-            # self.drawings[self.page].append(line)
             self.handwriting.append(line)
             self.start = event.scenePos()
 
         elif self.status == GraphicsScene.ERASING:
             if self.start is not None:
                 self.gum.setPos(event.scenePos() - QLine(50, 50, 50, 50).p2())
-                for item in self.gum.collidingItems():
+                colliding = self.gum.collidingItems()
+                for item in colliding:
                     if type(item) in [QGraphicsPixmapItem, QGraphicsProxyWidget]:
                         continue
                     if item in self.drawings.get(self.page, []):
                         self.drawings[self.page].remove(item)
-                    self.removeItem(item)
+                        self.removeItem(item)
 
         elif self.status in [GraphicsScene.RECTANGLES, GraphicsScene.ELLIPSES]:
             if self.start is None:
                 return
             self.rectangle.setRect(QRectF(self.start, event.scenePos()))
+
+
+    def mouseReleaseEvent(self, event):
+        super().mouseReleaseEvent(event)
+        self.start = None
+        self.rectangle = None
+
+        if self.status == GraphicsScene.WRITING:
+            self.smooth_handwriting()
+        print("---")
+        for i in self.items():
+            print(i)
+
+    def smooth_handwriting(self):
+        points = []
+        for p in self.handwriting:  # type: QGraphicsLineItem
+            points.append((p.line().x1(), p.line().y1()))
+
+        for line in self.handwriting:
+            self.removeItem(line)
+
+        smoothed = smooth_with_savgol(points, 20, 4)
+
+        if len(smoothed) > 0:
+            p1 = smoothed[0]
+            for p2 in smoothed[1:]:
+                line = self.addLine(QLineF(QPointF(*p1), QPointF(*p2)), self.color)
+                if self.drawings.get(self.page) is None:
+                    self.drawings[self.page] = []
+                self.drawings[self.page].append(line)
+                p1 = p2
+
+
+
 
     def erase_all(self):
         for item in self.drawings.get(self.page, []):
