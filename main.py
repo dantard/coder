@@ -792,11 +792,20 @@ class MainWindow(QMainWindow):
         menu.addAction("Open", self.open_slides)
         menu.addSeparator()
         m3 = menu.addMenu("Mode")
+
+        # NONE = 0
+        # POINTER = 1
+        # WRITING = 2
+        # ERASING = 3
+        # RECTANGLES = 4
+        # ELLIPSES = 5
+
         m3.addAction("None", lambda: self.set_writing_mode(0))
-        m3.addAction("Write", lambda: self.set_writing_mode(1))
-        m3.addAction("Erase", lambda: self.set_writing_mode(2))
-        m3.addAction("Rectangles", lambda: self.set_writing_mode(3))
-        m3.addAction("Ellipses", lambda: self.set_writing_mode(4))
+        m3.addAction("Pointer", lambda: self.set_writing_mode(1))
+        m3.addAction("Write", lambda: self.set_writing_mode(2))
+        m3.addAction("Erase", lambda: self.set_writing_mode(3))
+        m3.addAction("Rectangles", lambda: self.set_writing_mode(4))
+        m3.addAction("Ellipses", lambda: self.set_writing_mode(5))
 
         menu.addAction("Exit", self.close)
 
