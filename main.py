@@ -37,7 +37,7 @@ class PythonHighlighter(QSyntaxHighlighter):
                 'from', 'global', 'del', 'print', 'None', 'pass', 'class', 'as',
                 'break', 'while', 'await', 'async', 'range', 'is', 'True', 'lambda',
                 'False', 'in', 'import', 'except', 'continue', 'and', 'raise', 'with',
-                'if', 'try', 'for', 'else', 'not', 'def', 'danilo', "input", "int", "float", "str", "list", "dict",
+                'if', 'try', 'for', 'else', 'not', 'def', "input", "int", "float", "str", "list", "dict",
                 ]
 
     def __init__(self, document):
@@ -45,7 +45,7 @@ class PythonHighlighter(QSyntaxHighlighter):
         self.highlighting_rules = []
 
         keyword_format = QTextCharFormat()
-        keyword_format.setForeground(QColor("blue"))
+        keyword_format.setForeground(QColor("cyan"))
         keyword_format.setFontWeight(QFont.Bold)
 
         # print(set(keywords))
@@ -301,7 +301,14 @@ class PythonEditor(QTextEdit):
     def autocomplete(self):
 
         current_line = self.get_current_line_text()
-        print("current line*"+ current_line + "*")
+        print("current line*"+ current_line + "*", len(current_line))
+
+        if len(current_line) == 0 or current_line.endswith("    "):
+            self.setText(self.toPlainText() + "    ")
+            self.choosing = None
+            self.moveCursor(QtGui.QTextCursor.End)
+            return
+
         if len(current_line) > 0 and current_line[-1] in " (:":
             self.choosing = None
             return
@@ -597,7 +604,7 @@ class MainWindow(QMainWindow):
         if self.config.get("fullscreen", False):
             self.toggle_fullscreen()
 
-        if self.config.get("dark", True):
+        if self.config.get("dark", False):
             self.jupyter_widget.set_default_style(colors='linux')
             self.text_edit.setStyleSheet("background-color: #000000; color: white")
             self.line_number_area.setStyleSheet("background-color: #000000; color: white")
