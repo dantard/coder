@@ -562,6 +562,7 @@ class Slides(QWidget):
 
             proxy = QGraphicsProxyWidget(self.scene.pixmap)
             proxy.setWidget(play_button)
+            #proxy.setFlags(QGraphicsItem.ItemIgnoresTransformations)
 
             # Add the proxy widget to the scene
             # self.scene.addItem(proxy)

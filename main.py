@@ -130,15 +130,20 @@ class PythonEditor(QTextEdit):
         cursor.select(QTextCursor.LineUnderCursor)
 
         highlight_format = QTextCharFormat()
-        highlight_format.setBackground(QColor(0, 0, 0, 30))
+        highlight_format.setBackground(self.line_highlighter_color)
         cursor.setCharFormat(highlight_format)
         cursor.setPosition(position)
+
+    def set_line_highlighter_color(self, color):
+        self.line_highlighter_color = color
+        self.update()
 
     def __init__(self, font_size=18):
         super().__init__()
         # self.setTabStopWidth()
         # set mono font
 
+        self.line_highlighter_color = QColor(0, 0, 0, 30)
         self.choosing = None
         self.candidates = []
         self.mode = 0
@@ -217,6 +222,7 @@ class PythonEditor(QTextEdit):
         else:
             self.setText(autopep8.fix_code(self.code))
             self.set_mode(0)
+        self.moveCursor(QtGui.QTextCursor.End)
 
     def get_current_line_text(self):
         # Get the QTextCursor
@@ -302,6 +308,7 @@ class PythonEditor(QTextEdit):
                 self.choosing = None
                 self.candidates.clear()
                 super().keyPressEvent(e)
+        self.cursorPositionChanged.emit()
 
     def autocomplete(self):
 
@@ -330,12 +337,17 @@ class PythonEditor(QTextEdit):
         if len(words) == 0:
             return
 
-        last_word = words[-1]
+        last_word = words.pop(-1)
 
         if last_word == "":
             return
 
         keywords = list(set(PythonHighlighter.keywords + words))
+        # I want the last word to be the last one
+        # because otherwise could pop up at the
+        # beginning, and it would be annoying
+
+        keywords.append(last_word)
         if "" in keywords:
             keywords.remove("")
 
@@ -388,7 +400,7 @@ class Author(QDialog):
     def __init__(self):
         super().__init__()
         self.setLayout(QVBoxLayout())
-        self.setMinimumSize(400,350)
+        self.setMinimumSize(400, 350)
         self.setWindowTitle("About")
         textEdit = QTextEdit()
         textEdit.setReadOnly(True)
@@ -574,7 +586,7 @@ class MainWindow(QMainWindow):
             self.line_number_area.clear()
             text = ""
 
-            for i in range(len(lines) + 1):
+            for i in range(len(lines)):  # TODO: was +`11 (maybe for when the editor is full)
                 # self.line_number_area.append("{:3d}".format(i + 1))
                 text += "{:3d}\n".format(i + 1)
             self.line_number_area.setPlainText(text)
@@ -631,11 +643,10 @@ class MainWindow(QMainWindow):
         m2 = menu.addMenu("Help")
         m2.addAction("About", lambda: Author().exec_())
 
-
         def fill():
             m1.clear()
             pwd = os.getcwd()
-            path = str(pwd) + os.sep + "slides"
+            path = self.config.get("slides_path", str(pwd) + os.sep + "slides")
             if not os.path.exists(path):
                 os.makedirs(path)
             for filename in os.listdir(path):
@@ -686,12 +697,14 @@ class MainWindow(QMainWindow):
             self.jupyter_widget.set_default_style(colors='linux')
             self.text_edit.setStyleSheet("background-color: #000000; color: white")
             self.line_number_area.setStyleSheet("background-color: #000000; color: white")
+            self.line_number_area.line_highlighter_color = QColor(255, 255, 255, 80)
             color = "white"
         else:
             self.setStyleSheet("")
             self.jupyter_widget.set_default_style()
             self.text_edit.setStyleSheet("")
             self.line_number_area.setStyleSheet("")
+            self.line_number_area.line_highlighter_color = QColor(0, 0, 0, 30)
             color = "black"
 
         self.highlighter = PythonHighlighter(self.text_edit.document(), dark=dark)
@@ -766,7 +779,9 @@ class MainWindow(QMainWindow):
         super().keyPressEvent(a0)
 
     def save_as(self):
-        filename, ok = QFileDialog.getSaveFileName(self, "Save code", filter="Python files (*.py)", directory="progs")
+        pwd = os.getcwd()
+        path = self.config.get("progs_path", str(pwd) + os.sep + "progs")
+        filename, ok = QFileDialog.getSaveFileName(self, "Save code", filter="Python files (*.py)", directory=path)
         if ok:
             filename = filename.replace(".py", "") + ".py"
             with open(filename, "w") as f:
@@ -842,9 +857,11 @@ class MainWindow(QMainWindow):
 
     def open_slides(self, filename=None, page=0):
         # open pdf file
+        pwd = os.getcwd()
+        path = self.config.get("slides_path", str(pwd) + os.sep + "slides")
         if filename is None:
             filename, ok = QFileDialog.getOpenFileName(self, "Open PDF file", filter="PDF files (*.pdf)",
-                                                       directory="slides")
+                                                       directory=path, options=QFileDialog.Options())
 
         if filename:
             name = filename.split("/")[-1].replace(".pdf", "")
@@ -914,9 +931,11 @@ class MainWindow(QMainWindow):
             self.menuBar().hide()
 
     def code_from_slide(self, code):
+        self.text_edit.setText("")
         self.text_edit.set_code(code)
         self.text_edit.set_mode(1)
         self.tabs.setCurrentIndex(0)
+        self.text_edit.setFocus()
 
     def load_program(self, filename):
         if filename == "Select program":
