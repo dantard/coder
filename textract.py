@@ -187,6 +187,8 @@ class GraphicsScene(QGraphicsScene):
 
 class GraphicsView(QGraphicsView):
 
+    resized = pyqtSignal()
+
     def __init__(self, a):
         super().__init__(a)
         self.setRenderHint(QPainter.SmoothPixmapTransform)
@@ -204,6 +206,7 @@ class GraphicsView(QGraphicsView):
         transf.scale(ratio, ratio)
         self.setTransform(transf)
         self.scene().setSceneRect(0, 0, self.scene().image.width(), self.scene().image.height())
+        self.resized.emit()
 
         # if self.scence is not None:
         #    self.scene().removeItem(self.scence)
@@ -217,22 +220,125 @@ class Slides(QWidget):
     play_code = pyqtSignal(str)
 
     def set_writing_mode(self, mode):
+        for i, elem in enumerate(self.group):
+            elem.blockSignals(True)
+            elem.setChecked(i == mode)
+            elem.blockSignals(False)
+
         self.scene.status = mode
         self.scene.gum.setVisible(mode == GraphicsScene.ERASING)
+
         if mode == GraphicsScene.POINTER:
             self.view.setCursor(QCursor(create_cursor_image()))
         else:
             self.view.setCursor(Qt.ArrowCursor)
 
     def set_color(self, color):
+        for i, elem in enumerate(self.color_group):
+            elem.blockSignals(True)
+            elem.setChecked(i == color)
+            elem.blockSignals(False)
+
         colors = [Qt.black, Qt.red, Qt.green, Qt.blue, Qt.yellow, Qt.magenta, Qt.cyan, Qt.gray]
-        self.scene.color = QPen(colors[color], 2)
+        self.scene.color = QPen(colors[color], self.scene.color.width())
+        if self.scene.status in [GraphicsScene.NONE, GraphicsScene.ERASING]:
+            self.set_writing_mode(GraphicsScene.WRITING)
 
     def erase_all(self):
         self.scene.erase_all()
 
-    def __init__(self, pdf_path, page):
+    def create_toolbar(self):
+        toolbar = QToolBar()
+        #toolbar.setMaximumHeight(35)
+        toolbar.show()
+
+        none = toolbar.addAction("", lambda: self.set_writing_mode(0))
+        none.setIcon(QIcon(":/icons/cursor.svg"))
+        none.setCheckable(True)
+        none.setChecked(True)
+
+        pointer = toolbar.addAction("Pointer", lambda: self.set_writing_mode(1))
+        pointer.setIcon(QIcon(":/icons/origin.svg"))
+        pointer.setCheckable(True)
+
+        write = toolbar.addAction("", lambda: self.set_writing_mode(2))
+        write.setIcon(QIcon(":/icons/edit.svg"))
+        write.setCheckable(True)
+
+        rectangle = toolbar.addAction(QIcon("icons/rectangle.svg"), "", lambda: self.set_writing_mode(4))
+        rectangle.setCheckable(True)
+        circle = toolbar.addAction(QIcon("icons/circle.svg"), "", lambda: self.set_writing_mode(5))
+        circle.setCheckable(True)
+
+        toolbar.addSeparator()
+        erase = toolbar.addAction("", lambda: self.set_writing_mode(3))
+        erase.setIcon(QIcon("icons/cancel.svg"))
+        erase.setCheckable(True)
+        toolbar.addSeparator()
+
+        self.group = [none, pointer, write, erase, rectangle, circle]
+
+
+        erase_all = toolbar.addAction("", lambda: self.erase_all())
+        erase_all.setIcon(QIcon("icons/bin.svg"))
+
+        toolbar.addSeparator()
+        t1 = toolbar.addAction(QIcon("icons/minus.svg"), "", lambda: self.set_thickness(0))
+        t1.setCheckable(True)
+        t1.setChecked(True)
+        t2 = toolbar.addAction(QIcon("icons/minus_med.svg"), "", lambda: self.set_thickness(1))
+        t2.setCheckable(True)
+        t3 = toolbar.addAction(QIcon("icons/minus_big.svg"), "", lambda: self.set_thickness(2))
+        t3.setCheckable(True)
+
+        self.thickness_group = [t1, t2, t3]
+
+        toolbar.addSeparator()
+        black = toolbar.addAction("", lambda: self.set_color(0))
+        black.setIcon(QIcon(":/icons/black.svg"))
+        red = toolbar.addAction("", lambda: self.set_color(1))
+        red.setIcon(QIcon(":/icons/red.svg"))
+        green = toolbar.addAction("", lambda: self.set_color(2))
+        green.setIcon(QIcon(":/icons/green.svg"))
+        blue = toolbar.addAction("", lambda: self.set_color(3))
+        blue.setIcon(QIcon(":/icons/blue.svg"))
+
+        self.color_group = [black, red, green, blue]
+        for elem in self.color_group:
+            elem.setCheckable(True)
+        black.setChecked(True)
+
+        toolbar.addSeparator()
+
+        prev = toolbar.addAction("✕", lambda: self.move_to(False))
+        prev.setIcon(QIcon(":/icons/arrow-left.svg"))
+
+        self.action_touchable = toolbar.addAction("Pointer")
+        self.action_touchable.setCheckable(True)
+        self.action_touchable.setIcon(QIcon(":/icons/pan.svg"))
+
+        next1 = toolbar.addAction("⬇", lambda: self.move_to(True))
+        next1.setIcon(QIcon(":/icons/arrow-right.svg"))
+        return toolbar
+
+    def set_thickness(self, thickness):
+        for i, elem in enumerate(self.thickness_group):
+            elem.blockSignals(True)
+            elem.setChecked(i == thickness)
+            elem.blockSignals(False)
+
+        self.scene.color = QPen(self.scene.color.color(), 2+ thickness*4)
+        if self.scene.status in [GraphicsScene.NONE, GraphicsScene.ERASING]:
+            self.set_writing_mode(GraphicsScene.WRITING)
+
+    def __init__(self, config, pdf_path, page):
         super().__init__()
+        self.config = config
+        self.thickness = 2
+        self.action_touchable = None
+        self.group = []
+        self.color_group = []
+        self.toolbar = None
 
         self.touchable = True
         self.program = ""
@@ -242,11 +348,13 @@ class Slides(QWidget):
         self.doc = fitz.open(pdf_path)
         self.filename = pdf_path
         self.page = page
+        self.base = None
 
         # Create a QLabel to display the image
         self.scene = GraphicsScene()
         self.scene.navigate.connect(self.navigate)
         self.view = GraphicsView(self.scene)
+        self.view.resized.connect(self.resized)
         self.view.setAlignment(Qt.AlignCenter)
         self.view.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
 
@@ -267,6 +375,24 @@ class Slides(QWidget):
 
         self.setLayout(layout)
         self.update_image()
+        toolbar = self.create_toolbar()
+        if self.config.get("floating_toolbar", False):
+            toolbar.setOrientation(Qt.Vertical)
+            self.base = QGraphicsRectItem(0, 0, 35, 15, self.scene.pixmap)
+            self.base.setBrush(QColor(220, 220, 220))
+            self.base.setPen(Qt.transparent)
+            self.proxy = QGraphicsProxyWidget(self.base)
+            self.proxy.setWidget(toolbar)
+            self.proxy.setPos(-2, 10)
+            self.proxy.setZValue(1)
+            self.base.setFlags(QGraphicsItem.ItemIgnoresTransformations | QGraphicsItem.ItemIsMovable)
+            self.proxy.show()
+        else:
+            toolbar.setOrientation(Qt.Horizontal)
+            self.toolbar = toolbar
+            self.toolbar.show()
+
+
         QTimer.singleShot(0, self.resize_image)
 
         QApplication.instance().setStyleSheet("""
@@ -278,6 +404,11 @@ class Slides(QWidget):
                         border: 1px solid #ffffff;
                     }
                 """)
+    def resized(self):
+        if self.base is not None:
+            self.base.setPos(0, 0)
+    def get_toolbar(self):
+        return self.toolbar
 
     def navigate(self, delta):
         self.page = (self.page + delta) % len(self.doc)
@@ -307,9 +438,6 @@ class Slides(QWidget):
                 f"python -c \"{self.program}\""
             ])
 
-    def set_touchable(self, touchable):
-        self.touchable = touchable
-
     def mousePressEvent(self, a0):
         super().mousePressEvent(a0)
         if a0.button() == Qt.RightButton:
@@ -318,7 +446,7 @@ class Slides(QWidget):
         if self.scene.status != GraphicsScene.NONE:
             return
 
-        if self.touchable:
+        if not self.action_touchable.isChecked():
             right_side = a0.x() > self.view.width() // 2
             self.move_to(right_side)
 
