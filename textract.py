@@ -22,7 +22,7 @@ class Eraser(QGraphicsEllipseItem):
     pass
 
 
-def smooth_with_savgol(points, window_size=5, poly_order=2):
+def smooth_with_savgol(points, window_size=10, poly_order=2):
     if len(points) < window_size:
         return points
     x = [p[0] for p in points]
@@ -265,14 +265,14 @@ class Slides(QWidget):
         write.setIcon(QIcon(":/icons/edit.svg"))
         write.setCheckable(True)
 
-        rectangle = toolbar.addAction(QIcon("icons/rectangle.svg"), "", lambda: self.set_writing_mode(4))
+        rectangle = toolbar.addAction(QIcon(":/icons/rectangle.svg"), "", lambda: self.set_writing_mode(4))
         rectangle.setCheckable(True)
-        circle = toolbar.addAction(QIcon("icons/circle.svg"), "", lambda: self.set_writing_mode(5))
+        circle = toolbar.addAction(QIcon(":/icons/circle.svg"), "", lambda: self.set_writing_mode(5))
         circle.setCheckable(True)
 
         toolbar.addSeparator()
         erase = toolbar.addAction("", lambda: self.set_writing_mode(3))
-        erase.setIcon(QIcon("icons/cancel.svg"))
+        erase.setIcon(QIcon(":/icons/cancel.svg"))
         erase.setCheckable(True)
         toolbar.addSeparator()
 
@@ -280,15 +280,15 @@ class Slides(QWidget):
 
 
         erase_all = toolbar.addAction("", lambda: self.erase_all())
-        erase_all.setIcon(QIcon("icons/bin.svg"))
+        erase_all.setIcon(QIcon(":/icons/bin.svg"))
 
         toolbar.addSeparator()
-        t1 = toolbar.addAction(QIcon("icons/minus.svg"), "", lambda: self.set_thickness(0))
+        t1 = toolbar.addAction(QIcon(":/icons/minus.svg"), "", lambda: self.set_thickness(0))
         t1.setCheckable(True)
         t1.setChecked(True)
-        t2 = toolbar.addAction(QIcon("icons/minus_med.svg"), "", lambda: self.set_thickness(1))
+        t2 = toolbar.addAction(QIcon(":/icons/minus_med.svg"), "", lambda: self.set_thickness(1))
         t2.setCheckable(True)
-        t3 = toolbar.addAction(QIcon("icons/minus_big.svg"), "", lambda: self.set_thickness(2))
+        t3 = toolbar.addAction(QIcon(":/icons/minus_big.svg"), "", lambda: self.set_thickness(2))
         t3.setCheckable(True)
 
         self.thickness_group = [t1, t2, t3]
@@ -313,13 +313,20 @@ class Slides(QWidget):
         prev = toolbar.addAction("✕", lambda: self.move_to(False))
         prev.setIcon(QIcon(":/icons/arrow-left.svg"))
 
-        self.action_touchable = toolbar.addAction("Pointer")
+        self.action_touchable = toolbar.addAction("Hold")
         self.action_touchable.setCheckable(True)
         self.action_touchable.setIcon(QIcon(":/icons/pan.svg"))
+
+        toolbar.addAction(QIcon(":/icons/plus.svg"), "", self.add_empty_page)
 
         next1 = toolbar.addAction("⬇", lambda: self.move_to(True))
         next1.setIcon(QIcon(":/icons/arrow-right.svg"))
         return toolbar
+
+    def add_empty_page(self):
+        self.page+=1
+        self.pages_number.insert(self.page, None)
+        self.update_image()
 
     def set_thickness(self, thickness):
         for i, elem in enumerate(self.thickness_group):
@@ -340,12 +347,15 @@ class Slides(QWidget):
         self.color_group = []
         self.toolbar = None
 
+
         self.touchable = True
         self.program = ""
         self.code_buttons = []
         self.code_line_height = 0
         self.resized_pixmap = None
         self.doc = fitz.open(pdf_path)
+        self.pages_number = [i for i in range(len(self.doc))]
+
         self.filename = pdf_path
         self.page = page
         self.base = None
@@ -466,33 +476,37 @@ class Slides(QWidget):
         self.view.update()
 
     def update_image(self):
-        page = self.doc[self.page]
-
-        pix = self.doc[self.page].get_pixmap(matrix=fitz.Matrix(2, 2), alpha=False, annots=True)
-        image = QImage(pix.samples, pix.width, pix.height, pix.stride, QImage.Format_RGB888)
-        self.pixmap = QPixmap(image)  # QPixmap("/home/danilo/Pictures/aaa.png")
-        #        self.image_label.setPixmap(self.pixmap)
-        self.resize_image()
-        self.view.set_image(self.pixmap, self.page)
-
+        # Clear buttons
         for button, _ in self.code_buttons:
             self.scene.removeItem(button)
         self.code_buttons.clear()
 
-        for d in page.get_drawings():
-            fill = d.get("fill")
-            type = d.get("type")
-            color = d.get("color")
+        # Get number of page
+        pdf_page = self.pages_number[self.page]
+        if pdf_page is None:
+            image = QPixmap(1920, 1080)
+            image.fill(Qt.white)
+        else:
+            page = self.doc[pdf_page]
+            pix = page.get_pixmap(matrix=fitz.Matrix(2, 2), alpha=False, annots=True)
+            image = QImage(pix.samples, pix.width, pix.height, pix.stride, QImage.Format_RGB888)
+            for d in page.get_drawings():
+                fill = d.get("fill")
+                type = d.get("type")
+                color = d.get("color")
 
-            if type != 'f' and color == (1.0, 0, 1.0):
-                rect = d.get("rect")
-                # print(d)
-                # page.draw_rect(rect, color=(0, 0, 0), width=5)
+                if type != 'f' and color == (1.0, 0, 1.0):
+                    rect = d.get("rect")
+                    self.extract_text_and_fonts(rect)
 
-                # print(f"\nPage {self.page + 1}")
-                self.extract_text_and_fonts(rect)
+            self.update_button_pos()
 
-        self.update_button_pos()
+        self.pixmap = QPixmap(image)
+        self.resize_image()
+        self.view.set_image(self.pixmap, self.page)
+
+
+
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
