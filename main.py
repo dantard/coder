@@ -4,6 +4,7 @@ import re
 import sys
 import time
 import typing
+from easyconfig.EasyConfig import EasyConfig
 
 import resources  # noqa
 import yaml
@@ -17,6 +18,7 @@ from PyQt5.QtGui import QTextCharFormat, QColor, QFont, QSyntaxHighlighter, QPix
 from qtconsole.rich_jupyter_widget import RichJupyterWidget
 from qtconsole.manager import QtKernelManager
 
+from dialogs import Author
 from editor import PythonEditor, LanguageEditor, PascalEditor
 from highlighter import PythonHighlighter, PascalHighlighter
 from terminal import Jupyter, Console
@@ -53,120 +55,50 @@ class DynamicComboBox(QComboBox):
         self.blockSignals(False)
 
 
-class Author(QDialog):
-    def __init__(self):
-        super().__init__()
-        self.setLayout(QVBoxLayout())
-        self.setMinimumSize(400, 350)
-        self.setWindowTitle("About")
-        textEdit = QTextEdit()
-        textEdit.setReadOnly(True)
-        textEdit.setHtml("""<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SPICE - About</title>
-    <style>
-        body {
-            font-family: 'Arial', sans-serif;
-            background-color: #f4f4f9;
-            color: #333;
-            margin: 0;
-            padding: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            text-align: center;
-        }
-
-        .container {
-            background-color: #ffffff;
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-            width: 80%;
-            max-width: 600px;
-        }
-
-        h1 {
-            font-size: 3em;
-            color: #2c3e50;
-            margin-bottom: 20px;
-        }
-
-        p {
-            font-size: 1.2em;
-            line-height: 1.6;
-        }
-
-        ul {
-            list-style: none;
-            padding: 0;
-        }
-
-        ul li {
-            font-size: 1.1em;
-            margin: 5px 0;
-        }
-
-        .footer {
-            font-size: 1em;
-            color: #7f8c8d;
-            margin-top: 20px;
-        }
-
-        .footer p {
-            margin: 0;
-        }
-
-    </style>
-</head>
-<body>
-
-    <div class="container">
-        <h1>Spice</h1>
-        <h2><strong>Slides and Python for Interactive and Creative Education</strong></h2>
-        
-        <h4><strong>Developed by:</strong></h4>
-            <h2>Danilo Tardioli</h2>
-            <h3>Email: <a href="mailto:dantard@unizar.es">dantard@unizar.es</a></h3>
-        
-        <p><strong>Year:</strong> 2024</p>
-
-        <div class="footer">
-            <p><strong>Learn more at:</strong> <a href="https://github.com/dantard/coder">https://github.com/dantard/coder</a></p>
-        </div>
-    </div>
-
-</body>
-</html>
-
-        """)
-        self.layout().addWidget(textEdit)
-        close_button = QPushButton("Close")
-        close_button.setMaximumWidth(100)
-        # center the button
-        self.layout().addWidget(close_button)
-        self.layout().setAlignment(close_button, Qt.AlignRight)
-        close_button.clicked.connect(self.close)
-
-
 class MainWindow(QMainWindow):
+
+    def edit_config(self):
+        if self.config.edit():
+            self.config.save("spice.yaml")
+            for i in range(1,self.tabs.count()):
+                self.tabs.widget(i).set_toolbar_float(self.cfg_tb_float.get_value()==1, self.tabs)
+            self.update_toolbar_position()
+            self.apply_color_scheme(self.cfg_dark.get_value()==1)
+            self.language_editor.set_font_size(self.cfg_font_size.get_value() + 10)
+            self.console_widget.set_font_size(self.cfg_font_size.get_value() + 10)
+    def set_font_size(self, delta):
+        current_font_size = self.language_editor.text_edit.font().pixelSize()
+        goal = current_font_size + delta
+        if goal < 10 or goal > 32:
+            return
+        self.language_editor.set_font_size(goal)
+        self.console_widget.set_font_size(goal)
+        self.cfg_font_size.set_value(goal - 10)
+
     def __init__(self, language_editor, console):
         super().__init__()
 
-        try:
-            with open("config.yaml") as f:
-                self.config = yaml.full_load(f)
-        except:
-            self.config = {}
+        self.config = EasyConfig()
 
-        self.font_size = self.config.get("font_size", 18)
-        self.toolbar_pose = self.config.get("toolbar_pose", 140)
+        general = self.config.root()
+        self.cfg_dark = general.addCombobox("dark", pretty="Mode", items=["Light", "Dark"], default=0)
+        self.cfg_font_size = general.addCombobox("font_size", pretty="Font size", items=[str(i) for i in range(10, 33)],
+                                                 default=0)
+        self.cfg_tb_float = general.addCombobox("tb_float", pretty="Toolbar mode", items=["Fixed", "Float"], default=0)
+        hidden = self.config.root().addHidden("parameters")
+        self.cfg_last = hidden.addList("last")
+        self.cfg_show_sb = general.addCheckbox("show_tb", pretty="Show Toolbar", default=False)
+        self.cfg_open_fullscreen = general.addCheckbox("open_fullscreen", pretty="Open Fullscreen", default=False)
+        self.cfg_slides_path = general.addFolderChoice("slides_path", pretty="Slides Path",
+                                                       default=str(os.getcwd()) + os.sep + "slides")
 
+        self.config.load("spice.yaml")
+
+        self.font_size = self.cfg_font_size.get_value() + 10
+        self.toolbar_float = self.cfg_tb_float.get_value()
+        self.dark = self.cfg_dark.get_value() == 1
         self.setWindowTitle("Spice")
+
         # SPICE – Slides, Python, Interactive Creation, and Education
         # slides and python for interactive and creative education
 
@@ -198,6 +130,7 @@ class MainWindow(QMainWindow):
         self.language_editor = language_editor
         self.language_editor.ctrl_enter.connect(self.execute_code)
         self.language_editor.info.connect(self.update_status_bar)
+        self.language_editor.set_font_size(self.cfg_font_size.get_value()+10)
 
         bar = QToolBar()
         a1 = bar.addAction("Play", self.execute_code)
@@ -219,7 +152,6 @@ class MainWindow(QMainWindow):
         # self.line_number_area.setMaximumWidth(50)
         # lay.addWidget(self.line_number_area)
         # lay.addWidget(self.text_edit)
-        # self.text_edit.setLineWrapMode(QTextEdit.NoWrap)
 
         # self.text_edit.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         # self.line_number_area.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
@@ -251,7 +183,7 @@ class MainWindow(QMainWindow):
         left_layout.addWidget(self.language_editor)
 
         self.sb = QStatusBar()
-        if self.config.get("show_status_bar", False):
+        if self.cfg_show_sb.get_value():
             left_layout.addWidget(self.sb)
 
         # left_layout.addWidget(self.run_button)
@@ -267,6 +199,8 @@ class MainWindow(QMainWindow):
         # Right side: RichJupyterWidget
         self.console_widget = console
         splitter.addWidget(self.console_widget)
+        self.console_widget.set_font_size(self.cfg_font_size.get_value()+10)
+
 
         self.tabs.addTab(splitter, "Code Execution")
         tab_bar.setTabButton(0, QTabBar.ButtonPosition.RightSide, None)
@@ -287,23 +221,32 @@ class MainWindow(QMainWindow):
         file.addAction("Save As", self.save_as)
         file.addSeparator()
         file.addAction("Exit", self.close)
-
+        m3 = menu.addMenu("Edit")
+        m3.addAction("Preferences", self.edit_config)
         m2 = menu.addMenu("Help")
         m2.addAction("About", lambda: Author().exec_())
 
         def fill():
             m1.clear()
-            pwd = os.getcwd()
-            path = self.config.get("slides_path", str(pwd) + os.sep + "slides")
+            path = self.cfg_slides_path.get_value()
             if not os.path.exists(path):
                 os.makedirs(path)
             for filename in os.listdir(path):
-                m1.addAction(filename, lambda x=filename, y=filename: self.open_slides(pwd + "/slides/" + y))
+                m1.addAction(filename, lambda x=filename, y=filename: self.open_slides(path + y))
 
         m1.aboutToShow.connect(fill)
 
         q = QShortcut("Ctrl+M", self)
         q.activated.connect(self.toggle_color_scheme)
+
+        q = QShortcut("Ctrl++", self)
+        q.activated.connect(lambda: self.set_font_size(1))
+
+        q = QShortcut("Ctrl+-", self)
+        q.activated.connect(lambda: self.set_font_size(-1))
+
+        q = QShortcut("Ctrl+K", self)
+        q.activated.connect(self.clear_all)
 
         q = QShortcut("Ctrl+S", self)
         q.activated.connect(self.save_as)
@@ -328,20 +271,20 @@ class MainWindow(QMainWindow):
 
         self.tab_changed(0)
 
-        for elem in self.config.get("last", []):
+        for elem in self.cfg_last.get_value():
             self.open_slides(elem.get("filename"), elem.get("page", 0))
 
-        if self.config.get("fullscreen", False):
+        if self.cfg_open_fullscreen.get_value():
             self.toggle_fullscreen()
 
         QTimer.singleShot(100, self.update_toolbar_position)
 
     def toggle_color_scheme(self):
-        dark = not self.config.get("dark", True)
-        self.apply_color_scheme(dark)
+        self.dark = not self.dark
+        self.apply_color_scheme(self.dark)
+        self.cfg_dark.set_value(1 if self.dark else 0)
 
     def apply_color_scheme(self, dark):
-        self.config["dark"] = dark
         self.console_widget.set_dark_mode(dark)
         self.language_editor.set_dark_mode(dark)
 
@@ -428,7 +371,7 @@ class MainWindow(QMainWindow):
                 f.write(self.language_editor.get_text())
 
     def update_status_bar(self, x, timeout):
-        if self.config.get("show_status_bar", True):
+        if self.cfg_show_sb.get_value():
             x = x.replace("\n", "")
             diff = self.language_editor.get_remaining_chars()
             if timeout != 0:
@@ -453,8 +396,10 @@ class MainWindow(QMainWindow):
     def update_toolbar_position(self):
         if self.tabs.currentIndex() == 0:
             return
-        toolbar = self.tabs.currentWidget().get_toolbar()
-        if toolbar is not None:
+        widget = self.tabs.currentWidget()
+
+        if not widget.is_toolbar_float():
+            toolbar = widget.get_toolbar()
             toolbar.setParent(self.tabs)
             toolbar.show()
 
@@ -474,12 +419,12 @@ class MainWindow(QMainWindow):
 
     def tab_changed(self, index):
         for i in range(1, self.tabs.count()):
-            toolbar = self.tabs.widget(i).get_toolbar()
-            if toolbar is not None:
-                toolbar.hide()
+            widget = self.tabs.widget(i)
+            if not widget.is_toolbar_float():
+                widget.toolbar.hide()
 
         if index == 0:
-            self.apply_color_scheme(self.config.get("dark", False))
+            self.apply_color_scheme(self.cfg_dark.get_value() == 1)
         else:
             self.update_toolbar_position()
             self.setStyleSheet("")
@@ -493,8 +438,7 @@ class MainWindow(QMainWindow):
 
     def open_slides(self, filename=None, page=0):
         # open pdf file
-        pwd = os.getcwd()
-        path = self.config.get("slides_path", str(pwd) + os.sep + "slides")
+        path = self.cfg_slides_path.get_value()
         if filename is None:
             filename, ok = QFileDialog.getOpenFileName(self, "Open PDF file", filter="PDF files (*.pdf)",
                                                        directory=path, options=QFileDialog.Options())
@@ -503,20 +447,21 @@ class MainWindow(QMainWindow):
             name = filename.split("/")[-1].replace(".pdf", "")
             if os.path.exists(filename):
                 slides = Slides(self.config, filename, page)
+                slides.set_toolbar_float(self.cfg_tb_float.get_value() == 1, self.tabs)
                 slides.play_code.connect(self.code_from_slide)
                 self.tabs.addTab(slides, name)
                 self.tabs.setCurrentWidget(slides)
                 slides.view.setFocus()
 
     def closeEvent(self, a0):
-        self.config["last"] = []
+        last = []
         for i in range(1, self.tabs.count()):
             widget = self.tabs.widget(i)
             if isinstance(widget, Slides):
-                self.config["last"].append({"filename": widget.filename, "page": widget.page})
+                last.append({"filename": widget.filename, "page": widget.page})
+        self.cfg_last.set_value(last)
 
-        with open("config.yaml", "w") as f:
-            yaml.dump(self.config, f)
+        self.config.save("spice.yaml")
 
     def contextMenuEvent(self, event):
         menu = QMenu(self)
@@ -565,6 +510,7 @@ class MainWindow(QMainWindow):
         else:
             self.showFullScreen()
             self.menuBar().hide()
+        self.cfg_open_fullscreen.set_value(self.isFullScreen())
 
     def code_from_slide(self, code):
         self.language_editor.set_text("")

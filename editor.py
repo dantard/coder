@@ -5,8 +5,8 @@ import time
 import autopep8
 from PyQt5 import QtGui
 from PyQt5.QtCore import pyqtSignal, Qt
-from PyQt5.QtGui import QTextCursor, QTextCharFormat, QColor, QFont, QSyntaxHighlighter
-from PyQt5.QtWidgets import QTextEdit, QApplication, QWidget, QHBoxLayout
+from PyQt5.QtGui import QTextCursor, QTextCharFormat, QColor, QFont, QSyntaxHighlighter, QPainter, QFontMetrics
+from PyQt5.QtWidgets import QTextEdit, QApplication, QWidget, QHBoxLayout, QScrollBar
 
 
 class HighlightableTextEdit(QTextEdit):
@@ -50,18 +50,12 @@ class MagicEditor(QTextEdit):
         self.choosing = None
         self.candidates = []
         self.mode = 0
-        font = QFont("Monospace")
-        font.setStyleHint(QFont.TypeWriter)
-        font.setPixelSize(font_size)
-
-        self.setFont(font)
         self.code = ""
         self.count = 0
 
     def set_dark_mode(self, dark):
         self.highlighter.set_dark_mode(dark)
         self.highlighter.setDocument(self.document())
-
 
     def set_code(self, code):
         self.code = code
@@ -310,24 +304,38 @@ class PythonEditor(MagicEditor):
             return True
         return False
 
+class KK(QScrollBar):
+    def paintEvent(self, a0) -> None:
+        super().paintEvent(a0)
+        print("kkk", self.maximum())
+        if self.maximum() == 0:
+            p = QPainter(self)
+            p.fillRect(self.rect(), self.parent().palette().base().color())
+
+
 class LanguageEditor(QWidget):
     ctrl_enter = pyqtSignal()
     info = pyqtSignal(str, int)
 
-    def __init__(self, editor):
+    def __init__(self, editor, font_size=18):
         super().__init__()
         self.text_edit = editor
         self.line_number_area = HighlightableTextEdit()
         self.setLayout(QHBoxLayout())
         self.layout().addWidget(self.line_number_area)
         self.layout().addWidget(self.text_edit)
-        self.line_number_area.setFont(self.text_edit.font())
+        self.layout().setSpacing(0)
         self.line_number_area.setReadOnly(True)
-        self.line_number_area.setMaximumWidth(50)
+        self.text_edit.setLineWrapMode(QTextEdit.NoWrap)
+        self.line_number_area.setLineWrapMode(QTextEdit.NoWrap)
 
-        self.text_edit.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.text_edit: QTextEdit
+        self.text_edit.setHorizontalScrollBar(KK())
+        self.line_number_area.setHorizontalScrollBar(KK())
+
+        self.text_edit.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
         self.line_number_area.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.line_number_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.line_number_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
 
         self.text_edit.textChanged.connect(self.text_changed)
         self.text_edit.verticalScrollBar().valueChanged.connect(self.line_number_area.verticalScrollBar().setValue)
@@ -341,9 +349,22 @@ class LanguageEditor(QWidget):
         # self.line_number_area.setStyleSheet("QTextEdit { color: #a0a0a0;}")
         self.line_number_area.setContentsMargins(0, 0, 0, 0)
         self.text_edit.setContentsMargins(0, 0, 0, 0)
+        self.text_edit.document().setDocumentMargin(5)
+        self.line_number_area.document().setDocumentMargin(5)
 
         self.text_edit.cursorPositionChanged.connect(
             lambda: self.line_number_area.highlight_line(self.text_edit.textCursor().blockNumber()))
+
+        self.set_font_size(font_size)
+
+    def set_font_size(self, font_size):
+        font = QFont("Monospace")
+        font.setStyleHint(QFont.TypeWriter)
+        font.setPixelSize(font_size)
+        self.text_edit.setFont(font)
+        self.line_number_area.setFont(font)
+        three_numbers_width = QFontMetrics(font).width("000")
+        self.line_number_area.setMaximumWidth(int(three_numbers_width+12))
 
     def show_code(self):
         self.text_edit.show_all_code()
@@ -373,6 +394,8 @@ class LanguageEditor(QWidget):
         self.line_number_area.verticalScrollBar().setValue(v1)
         self.line_number_area.blockSignals(False)
 
+        print(self.text_edit.horizontalScrollBar().maximum(), self.text_edit.horizontalScrollBar().value())
+
     def format_code(self):
         self.text_edit.format_code()
 
@@ -387,6 +410,7 @@ class LanguageEditor(QWidget):
 
     def clear(self):
         self.text_edit.set_code("")
+        self.text_edit.setPlainText("")
         self.text_edit.count = 0
         self.text_edit.set_mode(0)
 

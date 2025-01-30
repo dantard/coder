@@ -21,6 +21,9 @@ class SpiceTerminal(QWidget):
     def set_dark_mode(self, value):
         pass
 
+    def set_font_size(self, size):
+        pass
+
 
 class Jupyter(SpiceTerminal):
 
@@ -85,6 +88,11 @@ class Jupyter(SpiceTerminal):
     def clear(self):
         self.jupyter_widget.execute("%clear")
 
+    def set_font_size(self, font_size):
+        font = QFont("Monospace")
+        font.setStyleHint(QFont.TypeWriter)
+        font.setPixelSize(font_size)
+        self.jupyter_widget._control.setFont(font)
 
 import platform
 

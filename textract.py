@@ -145,7 +145,6 @@ class GraphicsScene(QGraphicsScene):
                 return
             self.rectangle.setRect(QRectF(self.start, event.scenePos()))
 
-
     def mouseReleaseEvent(self, event):
         super().mouseReleaseEvent(event)
         self.start = None
@@ -176,9 +175,6 @@ class GraphicsScene(QGraphicsScene):
                 self.drawings[self.page].append(line)
                 p1 = p2
 
-
-
-
     def erase_all(self):
         for item in self.drawings.get(self.page, []):
             self.removeItem(item)
@@ -186,7 +182,6 @@ class GraphicsScene(QGraphicsScene):
 
 
 class GraphicsView(QGraphicsView):
-
     resized = pyqtSignal()
 
     def __init__(self, a):
@@ -249,7 +244,7 @@ class Slides(QWidget):
 
     def create_toolbar(self):
         toolbar = QToolBar()
-        #toolbar.setMaximumHeight(35)
+        # toolbar.setMaximumHeight(35)
         toolbar.show()
 
         none = toolbar.addAction("", lambda: self.set_writing_mode(0))
@@ -277,7 +272,6 @@ class Slides(QWidget):
         toolbar.addSeparator()
 
         self.group = [none, pointer, write, erase, rectangle, circle]
-
 
         erase_all = toolbar.addAction("", lambda: self.erase_all())
         erase_all.setIcon(QIcon(":/icons/bin.svg"))
@@ -324,7 +318,7 @@ class Slides(QWidget):
         return toolbar
 
     def add_empty_page(self):
-        self.page+=1
+        self.page += 1
         self.pages_number.insert(self.page, None)
         self.update_image()
 
@@ -334,7 +328,7 @@ class Slides(QWidget):
             elem.setChecked(i == thickness)
             elem.blockSignals(False)
 
-        self.scene.color = QPen(self.scene.color.color(), 2+ thickness*4)
+        self.scene.color = QPen(self.scene.color.color(), 2 + thickness * 4)
         if self.scene.status in [GraphicsScene.NONE, GraphicsScene.ERASING]:
             self.set_writing_mode(GraphicsScene.WRITING)
 
@@ -345,9 +339,6 @@ class Slides(QWidget):
         self.action_touchable = None
         self.group = []
         self.color_group = []
-        self.toolbar = None
-
-
         self.touchable = True
         self.program = ""
         self.code_buttons = []
@@ -368,6 +359,11 @@ class Slides(QWidget):
         self.view.setAlignment(Qt.AlignCenter)
         self.view.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
 
+        self.base = QGraphicsRectItem(0, 0, 35, 15, self.scene.pixmap)
+        self.base.setBrush(QColor(220, 220, 220))
+        self.base.setPen(Qt.transparent)
+        self.proxy = QGraphicsProxyWidget(self.base)
+
         # add shortcut ctrl+n to number of page
         def get_number_of_page():
             a, b = QInputDialog.getInt(self, "Number of page", "Enter the number of page", self.page + 1, 1,
@@ -385,23 +381,10 @@ class Slides(QWidget):
 
         self.setLayout(layout)
         self.update_image()
-        toolbar = self.create_toolbar()
-        if self.config.get("floating_toolbar", False):
-            toolbar.setOrientation(Qt.Vertical)
-            self.base = QGraphicsRectItem(0, 0, 35, 15, self.scene.pixmap)
-            self.base.setBrush(QColor(220, 220, 220))
-            self.base.setPen(Qt.transparent)
-            self.proxy = QGraphicsProxyWidget(self.base)
-            self.proxy.setWidget(toolbar)
-            self.proxy.setPos(-2, 10)
-            self.proxy.setZValue(1)
-            self.base.setFlags(QGraphicsItem.ItemIgnoresTransformations | QGraphicsItem.ItemIsMovable)
-            self.proxy.show()
-        else:
-            toolbar.setOrientation(Qt.Horizontal)
-            self.toolbar = toolbar
-            self.toolbar.show()
 
+        self.toolbar_float = None
+        self.toolbar = self.create_toolbar()
+        self.set_toolbar_float(True)
 
         QTimer.singleShot(0, self.resize_image)
 
@@ -414,9 +397,36 @@ class Slides(QWidget):
                         border: 1px solid #ffffff;
                     }
                 """)
+
+    def is_toolbar_float(self):
+        return self.toolbar_float
+
+    def set_toolbar_float(self, value, parent=None):
+
+        if value:
+            self.toolbar.setParent(None)
+            self.toolbar.setOrientation(Qt.Horizontal)
+            self.proxy.setWidget(self.toolbar)
+            self.proxy.setPos(-2, 10)
+            self.proxy.setZValue(1)
+            self.base.setFlags(QGraphicsItem.ItemIgnoresTransformations | QGraphicsItem.ItemIsMovable)
+            self.proxy.show()
+            self.base.show()
+            self.toolbar.show()
+
+        else:
+            self.proxy.setWidget(None)
+            self.base.hide()
+            self.toolbar.setParent(parent)
+            self.toolbar.setOrientation(Qt.Horizontal)
+            self.toolbar.show()
+
+        self.toolbar_float = value
+
     def resized(self):
         if self.base is not None:
             self.base.setPos(0, 0)
+
     def get_toolbar(self):
         return self.toolbar
 
@@ -505,9 +515,6 @@ class Slides(QWidget):
         self.resize_image()
         self.view.set_image(self.pixmap, self.page)
 
-
-
-
     def resizeEvent(self, event):
         super().resizeEvent(event)
         self.resize_image()
@@ -576,7 +583,7 @@ class Slides(QWidget):
 
             proxy = QGraphicsProxyWidget(self.scene.pixmap)
             proxy.setWidget(play_button)
-            #proxy.setFlags(QGraphicsItem.ItemIgnoresTransformations)
+            # proxy.setFlags(QGraphicsItem.ItemIgnoresTransformations)
 
             # Add the proxy widget to the scene
             # self.scene.addItem(proxy)
