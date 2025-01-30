@@ -7,13 +7,18 @@ from PyQt5.QtWidgets import QWidget, QVBoxLayout, QApplication
 from qtconsole.manager import QtKernelManager
 from qtconsole.rich_jupyter_widget import RichJupyterWidget
 from termqt import Terminal
-#from qtpyTerminal import qtpyTerminal
+
+
+# from qtpyTerminal import qtpyTerminal
 
 class SpiceTerminal(QWidget):
     def execute(self, code, clear=True):
         pass
 
     def clear(self):
+        pass
+
+    def set_dark_mode(self, value):
         pass
 
 
@@ -33,7 +38,7 @@ class Jupyter(SpiceTerminal):
         font.setPixelSize(font_size)
         self.jupyter_widget.font = font
 
-        #self.jupyter_widget._set_font()
+        # self.jupyter_widget._set_font()
         self.jupyter_widget.kernel_manager = kernel_manager
         self.jupyter_widget.kernel_client = kernel_client
 
@@ -49,6 +54,12 @@ class Jupyter(SpiceTerminal):
         layout = QVBoxLayout()
         layout.addWidget(self.jupyter_widget)
         self.setLayout(layout)
+
+    def set_dark_mode(self, value):
+        if value:
+            self.jupyter_widget.set_default_style(colors='linux')
+        else:
+            self.jupyter_widget.set_default_style(colors='lightbg')
 
     def execute(self, code, clear=True):
 
@@ -74,7 +85,9 @@ class Jupyter(SpiceTerminal):
     def clear(self):
         self.jupyter_widget.execute("%clear")
 
+
 import platform
+
 
 class Console(SpiceTerminal):
     def __init__(self):
@@ -118,20 +131,16 @@ class Console(SpiceTerminal):
         self.terminal.stdin_callback = terminal_io.write
         self.terminal.resize_callback = terminal_io.resize
         terminal_io.spawn()
-        #self.terminal.input("python")
-
-
-
+        # self.terminal.input("python")
 
     def execute(self, code, clear=True):
         with open("output.pas", "w") as f:
             f.write(code)
-        command = "FreePascal"+os.sep+"bin"+os.sep+"i386-win32"+os.sep+"fpc.exe output.pas && output.exe\r\n"
+        command = "FreePascal" + os.sep + "bin" + os.sep + "i386-win32" + os.sep + "fpc.exe output.pas && output.exe\r\n"
         self.terminal.input(command.encode("utf-8"))
 
     def clear(self):
         self.terminal.input("clear\r\n".encode("utf-8"))
-
 
 
 class Console2(SpiceTerminal):
@@ -142,12 +151,10 @@ class Console2(SpiceTerminal):
         self.terminal.term.setMinimumWidth(200)
         self.terminal.setMinimumWidth(200)
 
-
         layout = QVBoxLayout()
         layout.addWidget(self.terminal)
         self.setLayout(layout)
         self.terminal.start()
-
 
     def execute(self, code, clear=True):
         with open("output.pas", "w") as f:

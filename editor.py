@@ -5,14 +5,14 @@ import time
 import autopep8
 from PyQt5 import QtGui
 from PyQt5.QtCore import pyqtSignal, Qt
-from PyQt5.QtGui import QTextCursor, QTextCharFormat, QColor, QFont
+from PyQt5.QtGui import QTextCursor, QTextCharFormat, QColor, QFont, QSyntaxHighlighter
 from PyQt5.QtWidgets import QTextEdit, QApplication, QWidget, QHBoxLayout
 
 
 class HighlightableTextEdit(QTextEdit):
     def __init__(self):
         super().__init__()
-        self.line_highlighter_color = QColor(255, 255, 255, 30)
+        self.line_highlighter_color = QColor(255, 255, 255, 100)
 
     def highlight_line(self, line_number):
         cursor = self.textCursor()
@@ -58,6 +58,11 @@ class MagicEditor(QTextEdit):
         self.code = ""
         self.count = 0
 
+    def set_dark_mode(self, dark):
+        self.highlighter.set_dark_mode(dark)
+        self.highlighter.setDocument(self.document())
+
+
     def set_code(self, code):
         self.code = code
         self.set_mode(1)
@@ -67,8 +72,6 @@ class MagicEditor(QTextEdit):
         self.setCursorWidth(3 if self.mode == 1 else 1)
         # self.setReadOnly(self.mode == 1)
         self.update()
-
-
 
     def format_code(self):
         pass
@@ -341,6 +344,12 @@ class LanguageEditor(QWidget):
 
         self.text_edit.cursorPositionChanged.connect(
             lambda: self.line_number_area.highlight_line(self.text_edit.textCursor().blockNumber()))
+
+    def show_code(self):
+        self.text_edit.show_all_code()
+    def set_dark_mode(self, dark):
+        self.text_edit.set_dark_mode(dark)
+        self.line_number_area.set_line_highlighter_color(QColor(0,0,0,50) if not dark else QColor(255,255,255,100))
 
     def set_text(self, text):
         self.text_edit.setPlainText(text)

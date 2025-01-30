@@ -154,7 +154,7 @@ class Author(QDialog):
 
 
 class MainWindow(QMainWindow):
-    def __init__(self):
+    def __init__(self, language_editor, console):
         super().__init__()
 
         try:
@@ -194,15 +194,15 @@ class MainWindow(QMainWindow):
         left_widget = QWidget()
         left_layout = QVBoxLayout()
 
-        #self.text_edit = LanguageEditor(PythonEditor(PythonHighlighter()))
-        self.text_edit = LanguageEditor(PascalEditor(PascalHighlighter()))
-        self.text_edit.ctrl_enter.connect(self.execute_code)
-        self.text_edit.info.connect(self.update_status_bar)
+        # self.text_edit = LanguageEditor(PythonEditor(PythonHighlighter()))
+        self.language_editor = language_editor
+        self.language_editor.ctrl_enter.connect(self.execute_code)
+        self.language_editor.info.connect(self.update_status_bar)
 
         bar = QToolBar()
         a1 = bar.addAction("Play", self.execute_code)
         a2 = bar.addAction("Clear", self.clear_all)
-        a3 = bar.addAction("Show")#kk, self.text_edit.show_all_code)
+        a3 = bar.addAction("Show", self.language_editor.show_code)
 
         self.keep_banner = bar.addAction("#")
         self.keep_banner.setCheckable(True)
@@ -248,7 +248,7 @@ class MainWindow(QMainWindow):
         # self.text_edit.horizontalScrollBar().rangeChanged.connect(text_changed)
         # self.line_number_area.verticalScrollBar().valueChanged.connect(self.text_edit.verticalScrollBar().setValue)
 
-        left_layout.addWidget(self.text_edit)
+        left_layout.addWidget(self.language_editor)
 
         self.sb = QStatusBar()
         if self.config.get("show_status_bar", False):
@@ -257,16 +257,16 @@ class MainWindow(QMainWindow):
         # left_layout.addWidget(self.run_button)
         left_widget.setLayout(left_layout)
 
-#        lay.setSpacing(0)
-#        lay.setContentsMargins(0, 0, 0, 0)
+        #        lay.setSpacing(0)
+        #        lay.setContentsMargins(0, 0, 0, 0)
         left_layout.setSpacing(0)
         left_layout.setContentsMargins(0, 0, 0, 0)
 
         splitter.addWidget(left_widget)
 
         # Right side: RichJupyterWidget
-        self.jupyter_widget = Console()
-        splitter.addWidget(self.jupyter_widget)
+        self.console_widget = console
+        splitter.addWidget(self.console_widget)
 
         self.tabs.addTab(splitter, "Code Execution")
         tab_bar.setTabButton(0, QTabBar.ButtonPosition.RightSide, None)
@@ -318,7 +318,8 @@ class MainWindow(QMainWindow):
         q.activated.connect(self.toggle_focus)
 
         q = QShortcut("Ctrl+F", self)
-#        q.activated.connect(self.text_edit.format_code)
+
+        #        q.activated.connect(self.text_edit.format_code)
 
         def resize():
             splitter.setSizes([int(self.width() * 0.5), int(self.width() * 0.5)])
@@ -336,26 +337,18 @@ class MainWindow(QMainWindow):
         QTimer.singleShot(100, self.update_toolbar_position)
 
     def toggle_color_scheme(self):
-        self.config["dark"] = not self.config.get("dark", True)
-        self.apply_color_scheme(self.config["dark"])
+        dark = not self.config.get("dark", True)
+        self.apply_color_scheme(dark)
 
     def apply_color_scheme(self, dark):
-        if dark:
-            #self.setStyleSheet("background-color: #000000; color: white")
-            #self.text_edit.setStyleSheet("background-color: #000000; color: white")
-#kk            self.line_number_area.setStyleSheet("background-color: #000000; color: white")
-#kk            self.line_number_area.line_highlighter_color = QColor(255, 255, 255, 80)
-            color = "white"
-        else:
-            #self.setStyleSheet("")
-            #self.jupyter_widget.set_default_style()
-#            self.text_edit.setStyleSheet("")
-#            self.line_number_area.setStyleSheet("")
-#            self.line_number_area.line_highlighter_color = QColor(0, 0, 0, 30)
-            color = "black"
+        self.config["dark"] = dark
+        self.console_widget.set_dark_mode(dark)
+        self.language_editor.set_dark_mode(dark)
 
-#kk        self.highlighter = PythonHighlighter(self.text_edit.document(), dark=dark)
+        if self.tabs.currentIndex() == 0:
+            self.setStyleSheet("background-color: #000000; color: white" if dark else "")
 
+        color = Qt.white if dark else Qt.black
         a1, a2, a3, a4 = self.text_edit_group
         a1.setIcon(QIcon(self.color(":/icons/play.svg", color)))
         a2.setIcon(QIcon(self.color(":/icons/refresh.svg", color)))
@@ -401,10 +394,10 @@ class MainWindow(QMainWindow):
         self.tabs.currentWidget().set_color(color)
 
     def toggle_focus(self):
-        if self.text_edit.hasFocus():
-            self.jupyter_widget._control.setFocus()
+        if self.language_editor.hasFocus():
+            self.console_widget._control.setFocus()
         else:
-            self.text_edit.setFocus()
+            self.language_editor.setFocus()
 
     def set_writing_mode(self, mode):
         for i, elem in enumerate(self.group):
@@ -432,12 +425,12 @@ class MainWindow(QMainWindow):
         if ok:
             filename = filename.replace(".py", "") + ".py"
             with open(filename, "w") as f:
-                f.write(self.text_edit.get_text())
+                f.write(self.language_editor.get_text())
 
     def update_status_bar(self, x, timeout):
         if self.config.get("show_status_bar", True):
             x = x.replace("\n", "")
-            diff = self.text_edit.get_remaining_chars()
+            diff = self.language_editor.get_remaining_chars()
             if timeout != 0:
                 x = "{:5d} | {}".format(diff, x)
                 self.sb.showMessage(x, 1000)
@@ -475,8 +468,8 @@ class MainWindow(QMainWindow):
                                     40)
 
     def clear_all(self):
-        self.jupyter_widget.clear()
-        self.text_edit.clear()
+        self.console_widget.clear()
+        self.language_editor.clear()
         self.prog_cb.setCurrentIndex(0)
 
     def tab_changed(self, index):
@@ -574,11 +567,11 @@ class MainWindow(QMainWindow):
             self.menuBar().hide()
 
     def code_from_slide(self, code):
-        self.text_edit.set_text("")
-        self.text_edit.set_code(code)
-        self.text_edit.set_mode(1)
+        self.language_editor.set_text("")
+        self.language_editor.set_code(code)
+        self.language_editor.set_mode(1)
         self.tabs.setCurrentIndex(0)
-        self.text_edit.setFocus()
+        self.language_editor.setFocus()
 
     def load_program(self, filename):
         if filename == "Select program":
@@ -587,19 +580,26 @@ class MainWindow(QMainWindow):
 
         with open(f"progs/{filename}") as f:
             #    self.text_edit.setPlainText(f.read())
-            self.text_edit.set_code(f.read())
-            self.jupyter_widget.clear()
+            self.language_editor.set_code(f.read())
+            self.console_widget.clear()
 
     def execute_code(self):
-        self.text_edit.format_code()
-        self.jupyter_widget.execute(self.text_edit.get_text(), not self.keep_banner.isChecked())
+        self.language_editor.format_code()
+        self.console_widget.execute(self.language_editor.get_text(), not self.keep_banner.isChecked())
 
 
+if __name__ == "__main__2":
+    app = QApplication(sys.argv)
+
+    window = MainWindow(LanguageEditor(PascalEditor(PascalHighlighter())), Console())
+    window.show()
+
+    sys.exit(app.exec_())
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
 
-    window = MainWindow()
+    window = MainWindow(LanguageEditor(PythonEditor(PythonHighlighter())), Jupyter())
     window.show()
 
     sys.exit(app.exec_())
