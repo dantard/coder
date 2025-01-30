@@ -342,6 +342,10 @@ class LanguageEditor(QWidget):
         self.text_edit.cursorPositionChanged.connect(
             lambda: self.line_number_area.highlight_line(self.text_edit.textCursor().blockNumber()))
 
+    def set_text(self, text):
+        self.text_edit.setPlainText(text)
+        self.text_changed()
+
     def text_changed(self):
         text = self.text_edit.toPlainText()
         lines = text.split("\n")

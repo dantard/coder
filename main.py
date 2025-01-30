@@ -574,7 +574,7 @@ class MainWindow(QMainWindow):
             self.menuBar().hide()
 
     def code_from_slide(self, code):
-        self.text_edit.setText("")
+        self.text_edit.set_text("")
         self.text_edit.set_code(code)
         self.text_edit.set_mode(1)
         self.tabs.setCurrentIndex(0)

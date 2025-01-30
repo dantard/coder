@@ -1,3 +1,4 @@
+import os
 import sys
 
 from PyQt5.QtCore import QTimer, Qt
@@ -5,9 +6,8 @@ from PyQt5.QtGui import QFont
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QApplication
 from qtconsole.manager import QtKernelManager
 from qtconsole.rich_jupyter_widget import RichJupyterWidget
-
-import termqt
 from termqt import Terminal
+#from qtpyTerminal import qtpyTerminal
 
 class SpiceTerminal(QWidget):
     def execute(self, code, clear=True):
@@ -76,10 +76,10 @@ class Jupyter(SpiceTerminal):
 
 import platform
 
-class Console2(SpiceTerminal):
+class Console(SpiceTerminal):
     def __init__(self):
         super().__init__()
-        self.terminal = Terminal(800, 600)
+        self.terminal = Terminal(400, 600)
 
         layout = QVBoxLayout()
         layout.addWidget(self.terminal)
@@ -126,18 +126,21 @@ class Console2(SpiceTerminal):
     def execute(self, code, clear=True):
         with open("output.pas", "w") as f:
             f.write(code)
-        self.terminal.input("fpc output.pas && ./output\n".encode("utf-8"))
+        command = "FreePascal"+os.sep+"bin"+os.sep+"i386-win32"+os.sep+"fpc.exe output.pas && output.exe\r\n"
+        self.terminal.input(command.encode("utf-8"))
 
     def clear(self):
-        self.terminal.input("clear\n".encode("utf-8"))
+        self.terminal.input("clear\r\n".encode("utf-8"))
 
-from qtpyTerminal import qtpyTerminal
 
-class Console(SpiceTerminal):
+
+class Console2(SpiceTerminal):
     def __init__(self):
         super().__init__()
         self.terminal = qtpyTerminal()
         self.terminal.term.setFont(QFont("Monospace", 14))
+        self.terminal.term.setMinimumWidth(200)
+        self.terminal.setMinimumWidth(200)
 
 
         layout = QVBoxLayout()
