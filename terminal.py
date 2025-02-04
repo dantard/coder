@@ -4,6 +4,7 @@ import sys
 from PyQt5.QtCore import QTimer, Qt
 from PyQt5.QtGui import QFont
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QApplication
+from easyconfig.EasyConfig import EasyConfig
 from qtconsole.manager import QtKernelManager
 from qtconsole.rich_jupyter_widget import RichJupyterWidget
 from termqt import Terminal
@@ -12,6 +13,10 @@ from termqt import Terminal
 # from qtpyTerminal import qtpyTerminal
 
 class SpiceTerminal(QWidget):
+    def __init__(self):
+        super().__init__()
+        self.config = None
+
     def execute(self, code, clear=True):
         pass
 
@@ -22,6 +27,12 @@ class SpiceTerminal(QWidget):
         pass
 
     def set_font_size(self, size):
+        pass
+
+    def set_config(self, config):
+        self.config = config
+
+    def config_read(self):
         pass
 
 
@@ -75,6 +86,8 @@ class Jupyter(SpiceTerminal):
 
         self.editor.textChanged.connect(filtering)
         # self.jupyter_widget._control.setFocus()
+        if "input" in code:
+            self.jupyter_widget._control.setFocus()
         QApplication.processEvents()
 
         def run():
@@ -93,6 +106,7 @@ class Jupyter(SpiceTerminal):
         font.setStyleHint(QFont.TypeWriter)
         font.setPixelSize(font_size)
         self.jupyter_widget._control.setFont(font)
+
 
 import platform
 
@@ -141,11 +155,35 @@ class Console(SpiceTerminal):
         terminal_io.spawn()
         # self.terminal.input("python")
 
+    def set_config(self, config: EasyConfig):
+        super().set_config(config)
+        terminal = config.root().addSubSection("Terminal")
+        self.init = terminal.addString("init", pretty="Init command (e.g. python)")
+        self.temp_file = terminal.addString("temp_file", pretty="Temp file name")
+        self.command = terminal.addString("command", pretty="Command")
+
+    def config_read(self):
+        super().config_read()
+        init = self.init.get_value()
+        if init is not None:
+            init += "\n"
+            self.terminal.input(init.encode("utf-8"))
+
     def execute(self, code, clear=True):
-        with open("output.pas", "w") as f:
-            f.write(code)
-        command = "FreePascal" + os.sep + "bin" + os.sep + "i386-win32" + os.sep + "fpc.exe output.pas && output.exe\r\n"
-        self.terminal.input(command.encode("utf-8"))
+        temp_file = self.temp_file.get_value()
+        if temp_file is not None and temp_file.strip():
+            with open(temp_file, "w") as f:
+                f.write(code)
+        else:
+            self.terminal.input(code.encode("utf-8"))
+
+        command = self.command.get_value()
+        if command is not None and command.strip():
+            command += "\n"
+            self.terminal.input(command.encode("utf-8"))
+
+    # command = "FreePascal" + os.sep + "bin" + os.sep + "i386-win32" + os.sep + "fpc.exe output.pas && output.exe\r\n"
+    # self.terminal.input(command.encode("utf-8"))
 
     def clear(self):
         self.terminal.input("clear\r\n".encode("utf-8"))

@@ -531,7 +531,12 @@ class Slides(QWidget):
     def extract_text_and_fonts(self, rect=None):
         lines = []
         try:
-            page = self.doc[self.page]
+
+            page_without_empty = 0
+            for i in range(self.page+1):
+                page_without_empty += 1 if self.pages_number[i] is not None else 0
+
+            page = self.doc[page_without_empty - 1]
 
             # Extract blocks of text
             blocks = page.get_text("dict", clip=rect)['blocks']

@@ -58,6 +58,7 @@ class DynamicComboBox(QComboBox):
 class MainWindow(QMainWindow):
 
     def edit_config(self):
+        self.config.set_dialog_minimum_size(500, 300)
         if self.config.edit():
             self.config.save("spice.yaml")
             for i in range(1,self.tabs.count()):
@@ -90,9 +91,14 @@ class MainWindow(QMainWindow):
         self.cfg_show_sb = general.addCheckbox("show_tb", pretty="Show Toolbar", default=False)
         self.cfg_open_fullscreen = general.addCheckbox("open_fullscreen", pretty="Open Fullscreen", default=False)
         self.cfg_slides_path = general.addFolderChoice("slides_path", pretty="Slides Path",
-                                                       default=str(os.getcwd()) + os.sep + "slides")
+                                                       default=str(os.getcwd()) + os.sep + "slides/")
+        self.cfg_progs_path = general.addFolderChoice("progs_path", pretty="Programs Path", default=str(os.getcwd()) + os.sep + "progs/")
+
+        console.set_config(self.config)
 
         self.config.load("spice.yaml")
+
+        console.config_read()
 
         self.font_size = self.cfg_font_size.get_value() + 10
         self.toolbar_float = self.cfg_tb_float.get_value()
@@ -362,8 +368,7 @@ class MainWindow(QMainWindow):
         super().keyPressEvent(a0)
 
     def save_as(self):
-        pwd = os.getcwd()
-        path = self.config.get("progs_path", str(pwd) + os.sep + "progs")
+        path = self.cfg_progs_path.get_value()
         filename, ok = QFileDialog.getSaveFileName(self, "Save code", filter="Python files (*.py)", directory=path)
         if ok:
             filename = filename.replace(".py", "") + ".py"
@@ -444,6 +449,7 @@ class MainWindow(QMainWindow):
                                                        directory=path, options=QFileDialog.Options())
 
         if filename:
+            print("FF", filename)
             name = filename.split("/")[-1].replace(".pdf", "")
             if os.path.exists(filename):
                 slides = Slides(self.config, filename, page)
@@ -477,7 +483,7 @@ class MainWindow(QMainWindow):
             def fill():
                 pwd = os.getcwd()
                 for filename in os.listdir("slides"):
-                    m2.addAction(filename, lambda x=filename, y=filename: self.open_slides(pwd + "/slides/" + y))
+                    m2.addAction(filename, lambda x=filename, y=filename: self.open_slides(pwd + "/slisdes//" + y))
 
             m2.aboutToShow.connect(fill)
 

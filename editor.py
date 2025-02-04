@@ -215,9 +215,10 @@ class MagicEditor(QTextEdit):
         print("current line*" + current_line + "*", len(current_line))
 
         if len(current_line) == 0 or current_line.endswith("    "):
-            self.setText(self.toPlainText() + "    ")
+            #self.setText(self.toPlainText() + "    ")
+            self.insertPlainText("    ")
             self.choosing = None
-            self.moveCursor(QtGui.QTextCursor.End)
+            #self.moveCursor(QtGui.QTextCursor.End)
             return
 
         if len(current_line) > 0 and current_line[-1] in " (:)":

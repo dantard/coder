@@ -71,4 +71,4 @@ class PascalHighlighter(SyntaxHighlighter):
             "NOT", "OBJECT", "OF", "OR", "PACKED", "PROCEDURE", "PROGRAM", "RECORD", "REPEAT",
             "SET", "SHL", "SHR", "STRING", "THEN", "TO", "TYPE", "UNIT", "UNTIL", "USES",
             "VAR", "WHILE", "WITH", "XOR"
-        ], dark)
+        ])
