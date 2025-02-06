@@ -4,7 +4,7 @@ import re
 import sys
 import time
 import typing
-from easyconfig.EasyConfig import EasyConfig
+from easyconfig2.easyconfig import EasyConfig2 as EasyConfig
 
 import resources  # noqa
 import yaml
@@ -58,15 +58,19 @@ class DynamicComboBox(QComboBox):
 class MainWindow(QMainWindow):
 
     def edit_config(self):
-        self.config.set_dialog_minimum_size(500, 300)
-        if self.config.edit():
+        #self.config.set_dialog_minimum_size(500, 300)
+        print("TTTTTTTTTTT", self.cfg_font_size.get_value())
+
+        if self.config.edit(min_width=400, min_height=400):
             self.config.save("spice.yaml")
             for i in range(1,self.tabs.count()):
                 self.tabs.widget(i).set_toolbar_float(self.cfg_tb_float.get_value()==1, self.tabs)
             self.update_toolbar_position()
-            self.apply_color_scheme(self.cfg_dark.get_value()==1)
+            #self.apply_color_scheme(self.cfg_dark.get_value()==1)
             self.language_editor.set_font_size(self.cfg_font_size.get_value() + 10)
             self.console_widget.set_font_size(self.cfg_font_size.get_value() + 10)
+            print("TTTTTTTTTTT",self.cfg_font_size.get_value())
+
     def set_font_size(self, delta):
         current_font_size = self.language_editor.text_edit.font().pixelSize()
         goal = current_font_size + delta
@@ -76,18 +80,27 @@ class MainWindow(QMainWindow):
         self.console_widget.set_font_size(goal)
         self.cfg_font_size.set_value(goal - 10)
 
+    def change_font_size(self, x):
+        self.language_editor.set_font_size(x)
+        self.console_widget.set_font_size(x)
+        #self.cfg_font_size.set_value(x - 10)
+
     def __init__(self, language_editor, console):
         super().__init__()
 
-        self.config = EasyConfig()
+        self.config = EasyConfig(immediate=True)
 
         general = self.config.root()
         self.cfg_dark = general.addCombobox("dark", pretty="Mode", items=["Light", "Dark"], default=0)
+        self.cfg_dark.value_changed.connect(lambda x: self.apply_color_scheme(x.get()))
+
         self.cfg_font_size = general.addCombobox("font_size", pretty="Font size", items=[str(i) for i in range(10, 33)],
                                                  default=0)
+        self.cfg_font_size.value_changed.connect(lambda x: self.change_font_size(int(x.get()+10)))
+
         self.cfg_tb_float = general.addCombobox("tb_float", pretty="Toolbar mode", items=["Fixed", "Float"], default=0)
         hidden = self.config.root().addHidden("parameters")
-        self.cfg_last = hidden.addList("last")
+        self.cfg_last = hidden.addList("last", default=[])
         self.cfg_show_sb = general.addCheckbox("show_tb", pretty="Show Toolbar", default=False)
         self.cfg_open_fullscreen = general.addCheckbox("open_fullscreen", pretty="Open Fullscreen", default=False)
         self.cfg_slides_path = general.addFolderChoice("slides_path", pretty="Slides Path",
@@ -97,6 +110,7 @@ class MainWindow(QMainWindow):
         console.set_config(self.config)
 
         self.config.load("spice.yaml")
+        print("Loaded config", self.cfg_font_size.get_value())
 
         console.config_read()
 

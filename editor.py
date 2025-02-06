@@ -308,7 +308,6 @@ class PythonEditor(MagicEditor):
 class KK(QScrollBar):
     def paintEvent(self, a0) -> None:
         super().paintEvent(a0)
-        print("kkk", self.maximum())
         if self.maximum() == 0:
             p = QPainter(self)
             p.fillRect(self.rect(), self.parent().palette().base().color())

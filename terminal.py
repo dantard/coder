@@ -4,7 +4,7 @@ import sys
 from PyQt5.QtCore import QTimer, Qt
 from PyQt5.QtGui import QFont
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QApplication
-from easyconfig.EasyConfig import EasyConfig
+from easyconfig2.easyconfig import EasyConfig2
 from qtconsole.manager import QtKernelManager
 from qtconsole.rich_jupyter_widget import RichJupyterWidget
 from termqt import Terminal
@@ -155,9 +155,9 @@ class Console(SpiceTerminal):
         terminal_io.spawn()
         # self.terminal.input("python")
 
-    def set_config(self, config: EasyConfig):
+    def set_config(self, config: EasyConfig2):
         super().set_config(config)
-        terminal = config.root().addSubSection("Terminal")
+        terminal = config.root_node().addSubSection("Terminal")
         self.init = terminal.addString("init", pretty="Init command (e.g. python)")
         self.temp_file = terminal.addString("temp_file", pretty="Temp file name")
         self.command = terminal.addString("command", pretty="Command")
