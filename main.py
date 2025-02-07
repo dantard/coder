@@ -104,8 +104,8 @@ class MainWindow(QMainWindow):
         self.cfg_show_sb = general.addCheckbox("show_tb", pretty="Show Toolbar", default=False)
         self.cfg_open_fullscreen = general.addCheckbox("open_fullscreen", pretty="Open Fullscreen", default=False)
         self.cfg_slides_path = general.addFolderChoice("slides_path", pretty="Slides Path",
-                                                       default=str(os.getcwd()) + os.sep + "slides/")
-        self.cfg_progs_path = general.addFolderChoice("progs_path", pretty="Programs Path", default=str(os.getcwd()) + os.sep + "progs/")
+                                                       default=str(os.getcwd()) + os.sep + "slides" + os.sep)
+        self.cfg_progs_path = general.addFolderChoice("progs_path", pretty="Programs Path", default=str(os.getcwd()) + os.sep + "progs" + os.sep)
 
         console.set_config(self.config)
 
@@ -464,7 +464,7 @@ class MainWindow(QMainWindow):
 
         if filename:
             print("FF", filename)
-            name = filename.split("/")[-1].replace(".pdf", "")
+            name = filename.split(os.sep)[-1].replace(".pdf", "")
             if os.path.exists(filename):
                 slides = Slides(self.config, filename, page)
                 slides.set_toolbar_float(self.cfg_tb_float.get_value() == 1, self.tabs)
@@ -497,7 +497,7 @@ class MainWindow(QMainWindow):
             def fill():
                 pwd = os.getcwd()
                 for filename in os.listdir("slides"):
-                    m2.addAction(filename, lambda x=filename, y=filename: self.open_slides(pwd + "/slisdes//" + y))
+                    m2.addAction(filename, lambda x=filename, y=filename: self.open_slides(pwd + os.sep + "slisdes"  + os.sep + y))
 
             m2.aboutToShow.connect(fill)
 
@@ -544,7 +544,7 @@ class MainWindow(QMainWindow):
             self.clear_all()
             return
 
-        with open(f"progs/{filename}") as f:
+        with open("progs" + os.sep + filename) as f:
             #    self.text_edit.setPlainText(f.read())
             self.language_editor.set_code(f.read())
             self.console_widget.clear()
