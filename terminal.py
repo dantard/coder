@@ -15,6 +15,7 @@ from termqt import Terminal
 class SpiceTerminal(QWidget):
     def __init__(self):
         super().__init__()
+        self.keep_code = False
         self.config = None
 
     def execute(self, code, clear=True):
@@ -35,6 +36,8 @@ class SpiceTerminal(QWidget):
     def config_read(self):
         pass
 
+    def set_keep_code(self, value):
+        self.keep_code = value
 
 class Jupyter(SpiceTerminal):
 
@@ -79,6 +82,8 @@ class Jupyter(SpiceTerminal):
 
         # self.jupyter_widget._control.setText("")
         def filtering():
+            if self.keep_code:
+                return
             text = self.editor.toPlainText()
             if text.endswith("   ...: "):
                 if clear:
@@ -179,33 +184,30 @@ class Console(SpiceTerminal):
 
         command = self.command.get_value()
         if command is not None and command.strip():
-            command += "\n"
+            command += "\r\n"
             self.terminal.input(command.encode("utf-8"))
-
-    # command = "FreePascal" + os.sep + "bin" + os.sep + "i386-win32" + os.sep + "fpc.exe output.pas && output.exe\r\n"
-    # self.terminal.input(command.encode("utf-8"))
 
     def clear(self):
         self.terminal.input("clear\r\n".encode("utf-8"))
 
 
-class Console2(SpiceTerminal):
-    def __init__(self):
-        super().__init__()
-        self.terminal = qtpyTerminal()
-        self.terminal.term.setFont(QFont("Monospace", 14))
-        self.terminal.term.setMinimumWidth(200)
-        self.terminal.setMinimumWidth(200)
-
-        layout = QVBoxLayout()
-        layout.addWidget(self.terminal)
-        self.setLayout(layout)
-        self.terminal.start()
-
-    def execute(self, code, clear=True):
-        with open("output.pas", "w") as f:
-            f.write(code)
-        self.terminal.push("fpc output.pas && ./output\n")
-
-    def clear(self):
-        self.terminal.push("clear\n")
+# class Console2(SpiceTerminal):
+#     def __init__(self):
+#         super().__init__()
+#         self.terminal = qtpyTerminal()
+#         self.terminal.term.setFont(QFont("Monospace", 14))
+#         self.terminal.term.setMinimumWidth(200)
+#         self.terminal.setMinimumWidth(200)
+#
+#         layout = QVBoxLayout()
+#         layout.addWidget(self.terminal)
+#         self.setLayout(layout)
+#         self.terminal.start()
+#
+#     def execute(self, code, clear=True):
+#         with open("output.pas", "w") as f:
+#             f.write(code)
+#         self.terminal.push("fpc output.pas && ./output\n")
+#
+#     def clear(self):
+#         self.terminal.push("clear\n")

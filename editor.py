@@ -80,6 +80,7 @@ class MagicEditor(QTextEdit):
             self.insertPlainText(self.code[self.count])
             self.moveCursor(QtGui.QTextCursor.End)
             self.count += 1
+
             if self.code[self.count - 1] == "\n":
                 # if next line is empty continue
                 # and show that line too
@@ -212,13 +213,10 @@ class MagicEditor(QTextEdit):
     def autocomplete(self):
 
         current_line = self.get_current_line_text()
-        print("current line*" + current_line + "*", len(current_line))
 
         if len(current_line) == 0 or current_line.endswith("    "):
-            #self.setText(self.toPlainText() + "    ")
             self.insertPlainText("    ")
             self.choosing = None
-            #self.moveCursor(QtGui.QTextCursor.End)
             return
 
         if len(current_line) > 0 and current_line[-1] in " (:)":
@@ -251,8 +249,6 @@ class MagicEditor(QTextEdit):
         if "" in keywords:
             keywords.remove("")
 
-        print(keywords)
-
         self.candidates.clear()
         for keyword in keywords:
             if keyword.startswith(last_word):
@@ -271,7 +267,6 @@ class MagicEditor(QTextEdit):
         remaining = remaining.split("\n")
         remaining = remaining[1:]
         remaining = [x for x in remaining if x.strip()]
-        # print(remaining)
         if remaining:
             return remaining[0]
 
@@ -290,8 +285,7 @@ class PythonEditor(MagicEditor):
         current_line = self.get_current_line()
         spaces = self.get_spaces(current_line)
         if current_line.endswith(":"):
-            # is the cursor at the end of the line?
-            # print(self.textCursor().positionInBlock(), len(current_line))
+
             if self.textCursor().positionInBlock() == len(current_line):
                 self.insertPlainText("\n" + " " * (spaces + 4))
             else:
@@ -390,11 +384,8 @@ class LanguageEditor(QWidget):
             text += "{:3d}\n".format(i + 1)
         self.line_number_area.setPlainText(text)
 
-        # self.text_edit.setTextCursor(self.text_edit.textCursor())
         self.line_number_area.verticalScrollBar().setValue(v1)
         self.line_number_area.blockSignals(False)
-
-        print(self.text_edit.horizontalScrollBar().maximum(), self.text_edit.horizontalScrollBar().value())
 
     def format_code(self):
         self.text_edit.format_code()
@@ -417,6 +408,10 @@ class LanguageEditor(QWidget):
     def set_mode(self, mode):
         self.text_edit.set_mode(mode)
 
+    def get_code(self):
+        return self.text_edit.code
+
     def get_remaining_chars(self):
-        diff = len(self.get_text()) - self.text_edit.count
+        print("wtf", self.text_edit.count, len(self.get_text()))
+        diff = len(self.get_code()) - self.text_edit.count
         return diff

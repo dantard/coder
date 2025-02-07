@@ -58,9 +58,6 @@ class DynamicComboBox(QComboBox):
 class MainWindow(QMainWindow):
 
     def edit_config(self):
-        #self.config.set_dialog_minimum_size(500, 300)
-        print("TTTTTTTTTTT", self.cfg_font_size.get_value())
-
         if self.config.edit(min_width=400, min_height=400):
             self.config.save("spice.yaml")
             for i in range(1,self.tabs.count()):
@@ -69,7 +66,6 @@ class MainWindow(QMainWindow):
             #self.apply_color_scheme(self.cfg_dark.get_value()==1)
             self.language_editor.set_font_size(self.cfg_font_size.get_value() + 10)
             self.console_widget.set_font_size(self.cfg_font_size.get_value() + 10)
-            print("TTTTTTTTTTT",self.cfg_font_size.get_value())
 
     def set_font_size(self, delta):
         current_font_size = self.language_editor.text_edit.font().pixelSize()
@@ -110,7 +106,6 @@ class MainWindow(QMainWindow):
         console.set_config(self.config)
 
         self.config.load("spice.yaml")
-        print("Loaded config", self.cfg_font_size.get_value())
 
         console.config_read()
 
@@ -160,57 +155,20 @@ class MainWindow(QMainWindow):
         self.keep_banner = bar.addAction("#")
         self.keep_banner.setCheckable(True)
         self.keep_banner.setChecked(False)
+        self.keep_banner.triggered.connect(lambda: self.console_widget.set_keep_code(self.keep_banner.isChecked()))
 
         self.text_edit_group = [a1, a2, a3, self.keep_banner]
 
         left_layout.addWidget(bar)
         left_layout.addWidget(self.prog_cb)
-
-        # lay = QHBoxLayout()
-        #
-        # self.line_number_area.setReadOnly(True)
-        # self.line_number_area.setMaximumWidth(50)
-        # lay.addWidget(self.line_number_area)
-        # lay.addWidget(self.text_edit)
-
-        # self.text_edit.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        # self.line_number_area.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        # self.line_number_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-
-        # def text_changed():
-        #     text = self.text_edit.toPlainText()
-        #     lines = text.split("\n")
-        #     cursor_pos = self.text_edit.textCursor().position()
-        #     v1 = self.line_number_area.verticalScrollBar().value()
-        #     self.line_number_area.blockSignals(True)
-        #     self.line_number_area.clear()
-        #     text = ""
-        #
-        #     for i in range(len(lines)):  # TODO: was +`11 (maybe for when the editor is full)
-        #         # self.line_number_area.append("{:3d}".format(i + 1))
-        #         text += "{:3d}\n".format(i + 1)
-        #     self.line_number_area.setPlainText(text)
-        #
-        #     # self.text_edit.setTextCursor(self.text_edit.textCursor())
-        #     self.line_number_area.verticalScrollBar().setValue(v1)
-        #     self.line_number_area.blockSignals(False)
-        #
-        # self.text_edit.textChanged.connect(text_changed)
-        # self.text_edit.verticalScrollBar().valueChanged.connect(self.line_number_area.verticalScrollBar().setValue)
-        # self.text_edit.horizontalScrollBar().rangeChanged.connect(text_changed)
-        # self.line_number_area.verticalScrollBar().valueChanged.connect(self.text_edit.verticalScrollBar().setValue)
-
         left_layout.addWidget(self.language_editor)
 
         self.sb = QStatusBar()
         if self.cfg_show_sb.get_value():
             left_layout.addWidget(self.sb)
 
-        # left_layout.addWidget(self.run_button)
         left_widget.setLayout(left_layout)
 
-        #        lay.setSpacing(0)
-        #        lay.setContentsMargins(0, 0, 0, 0)
         left_layout.setSpacing(0)
         left_layout.setContentsMargins(0, 0, 0, 0)
 
@@ -230,7 +188,7 @@ class MainWindow(QMainWindow):
         helper.layout().setContentsMargins(0, 0, 0, 0)
         helper.layout().setSpacing(0)
         helper.layout().addWidget(self.tabs)
-        # helper.layout().addWidget(QStatusBar())
+
         self.setCentralWidget(helper)
 
         menu = self.menuBar()
@@ -463,7 +421,6 @@ class MainWindow(QMainWindow):
                                                        directory=path, options=QFileDialog.Options())
 
         if filename:
-            print("FF", filename)
             name = filename.split(os.sep)[-1].replace(".pdf", "")
             if os.path.exists(filename):
                 slides = Slides(self.config, filename, page)

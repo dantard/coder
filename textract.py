@@ -43,7 +43,6 @@ class GraphicsScene(QGraphicsScene):
     navigate = pyqtSignal(int)
 
     def keyPressEvent(self, event):
-        print("key", event.key())
         super().keyPressEvent(event)
         if event.key() == Qt.Key_E:
             self.status = GraphicsScene.ERASING
@@ -152,9 +151,6 @@ class GraphicsScene(QGraphicsScene):
 
         if self.status == GraphicsScene.WRITING:
             self.smooth_handwriting()
-        print("---")
-        for i in self.items():
-            print(i)
 
     def smooth_handwriting(self):
         points = []
@@ -435,7 +431,6 @@ class Slides(QWidget):
         self.update_image()
 
     def play_program(self, program):
-        # print(program)
         self.setFocus()
         self.play_code.emit(program)
         return
@@ -542,7 +537,7 @@ class Slides(QWidget):
             blocks = page.get_text("dict", clip=rect)['blocks']
             for block in blocks:
                 if 'lines' in block:  # Ensure the block contains text
-                    # print("\nBlock:")
+
                     block_bbox = block['bbox']  # Get block position
                     for line in block['lines']:
                         line_text = ""
@@ -558,8 +553,6 @@ class Slides(QWidget):
         except Exception as e:
             print(f"An error occurred: {e}")
 
-        # print("lines", lines)
-
         if len(lines) != 0:
             rect: Rect
 
@@ -570,7 +563,6 @@ class Slides(QWidget):
                 xs.add(x1)
             xs = list(xs)
             xs.sort()
-            # print(xs)
 
             program = str()
             for text, pos in lines:
