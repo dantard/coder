@@ -248,7 +248,7 @@ class MainWindow(QMainWindow):
 
         def fill():
             m1.clear()
-            path = self.cfg_slides_path.get_value()
+            path = self.cfg_slides_path.get_value() + os.sep
             if not os.path.exists(path):
                 os.makedirs(path)
             for filename in os.listdir(path):
@@ -382,7 +382,7 @@ class MainWindow(QMainWindow):
         super().keyPressEvent(a0)
 
     def save_as(self):
-        path = self.cfg_progs_path.get_value()
+        path = self.cfg_progs_path.get_value() + os.sep
         filename, ok = QFileDialog.getSaveFileName(self, "Save code", filter="Python files (*.py)", directory=path)
         if ok:
             filename = filename.replace(".py", "") + ".py"
@@ -457,7 +457,7 @@ class MainWindow(QMainWindow):
 
     def open_slides(self, filename=None, page=0):
         # open pdf file
-        path = self.cfg_slides_path.get_value()
+        path = self.cfg_slides_path.get_value() + os.sep
         if filename is None:
             filename, ok = QFileDialog.getOpenFileName(self, "Open PDF file", filter="PDF files (*.pdf)",
                                                        directory=path, options=QFileDialog.Options())
