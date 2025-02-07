@@ -195,7 +195,7 @@ class Console(SpiceTerminal):
         self.terminal.input("clear\r\n".encode("utf-8"))
 
     def get_file_extension(self):
-        return self.file_extension.get_item(self.file_extension.get())
+        return self.file_extension.get_item(self.file_extension.get(0))
 
 # class Console2(SpiceTerminal):
 #     def __init__(self):
