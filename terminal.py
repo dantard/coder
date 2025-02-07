@@ -157,7 +157,7 @@ class Console(SpiceTerminal):
 
     def set_config(self, config: EasyConfig2):
         super().set_config(config)
-        terminal = config.root_node().addSubSection("Terminal")
+        terminal = config.root().addSubSection("Terminal")
         self.init = terminal.addString("init", pretty="Init command (e.g. python)")
         self.temp_file = terminal.addString("temp_file", pretty="Temp file name")
         self.command = terminal.addString("command", pretty="Command")

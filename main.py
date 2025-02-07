@@ -554,18 +554,13 @@ class MainWindow(QMainWindow):
         self.console_widget.execute(self.language_editor.get_text(), not self.keep_banner.isChecked())
 
 
-if __name__ == "__main__2":
-    app = QApplication(sys.argv)
-
-    window = MainWindow(LanguageEditor(PascalEditor(PascalHighlighter())), Console())
-    window.show()
-
-    sys.exit(app.exec_())
-
 if __name__ == "__main__":
     app = QApplication(sys.argv)
+    if len(sys.argv) > 1:
+        window = MainWindow(LanguageEditor(PascalEditor(PascalHighlighter())), Console())
+    else:
+        window = MainWindow(LanguageEditor(PythonEditor(PythonHighlighter())), Jupyter())
 
-    window = MainWindow(LanguageEditor(PythonEditor(PythonHighlighter())), Jupyter())
     window.show()
 
     sys.exit(app.exec_())
