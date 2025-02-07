@@ -39,6 +39,9 @@ class SpiceTerminal(QWidget):
     def set_keep_code(self, value):
         self.keep_code = value
 
+    def get_file_extension(self):
+        return ".py"
+
 class Jupyter(SpiceTerminal):
 
     def __init__(self, font_size=18):
@@ -166,6 +169,7 @@ class Console(SpiceTerminal):
         self.init = terminal.addString("init", pretty="Init command (e.g. python)")
         self.temp_file = terminal.addString("temp_file", pretty="Temp file name")
         self.command = terminal.addString("command", pretty="Command")
+        self.file_extension = terminal.addCombobox("file_extension", pretty="File extension", items=[".py", ".pas"])
 
     def config_read(self):
         super().config_read()
@@ -190,6 +194,8 @@ class Console(SpiceTerminal):
     def clear(self):
         self.terminal.input("clear\r\n".encode("utf-8"))
 
+    def get_file_extension(self):
+        return self.file_extension.get_item(self.file_extension.get())
 
 # class Console2(SpiceTerminal):
 #     def __init__(self):

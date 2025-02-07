@@ -340,10 +340,11 @@ class MainWindow(QMainWindow):
         super().keyPressEvent(a0)
 
     def save_as(self):
+        ext = self.console_widget.get_file_extension()
         path = self.cfg_progs_path.get_value() + os.sep
-        filename, ok = QFileDialog.getSaveFileName(self, "Save code", filter="Python files (*.py)", directory=path)
+        filename, ok = QFileDialog.getSaveFileName(self, "Save code", filter="Language files (*"+ext+")", directory=path)
         if ok:
-            filename = filename.replace(".py", "") + ".py"
+            filename = filename.replace(ext, "") + ext
             with open(filename, "w") as f:
                 f.write(self.language_editor.get_text())
 
