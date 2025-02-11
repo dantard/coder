@@ -4,7 +4,7 @@ import time
 
 import autopep8
 from PyQt5 import QtGui
-from PyQt5.QtCore import pyqtSignal, Qt
+from PyQt5.QtCore import pyqtSignal, Qt, QTimer
 from PyQt5.QtGui import QTextCursor, QTextCharFormat, QColor, QFont, QSyntaxHighlighter, QPainter, QFontMetrics
 from PyQt5.QtWidgets import QTextEdit, QApplication, QWidget, QHBoxLayout, QScrollBar
 
@@ -43,15 +43,26 @@ class MagicEditor(QTextEdit):
     ctrl_enter = pyqtSignal()
     info = pyqtSignal(str, int)
 
+
     def __init__(self, highlighter=None, font_size=18):
         super().__init__()
+        self.suggestion = None
         self.highlighter = highlighter
         self.highlighter.setDocument(self.document())
-        self.choosing = None
         self.candidates = []
         self.mode = 0
         self.code = ""
         self.count = 0
+        self.delay = 0.01
+        self.autocomplete_words = []
+
+    def set_delay(self, delay):
+        self.delay = delay
+
+    def append_autocomplete(self, words, clear=False):
+        if clear:
+            self.autocomplete_words.clear()
+        self.autocomplete_words += words
 
     def set_dark_mode(self, dark):
         self.highlighter.set_dark_mode(dark)
@@ -75,7 +86,7 @@ class MagicEditor(QTextEdit):
 
     def complete_line(self, sleep=True):
         self.info.emit(self.get_next_line(), 0)
-        while self.count < len(self.code):
+        if self.count < len(self.code):
             # self.setText(self.toPlainText() + self.code[self.count])
             self.insertPlainText(self.code[self.count])
             self.moveCursor(QtGui.QTextCursor.End)
@@ -87,10 +98,11 @@ class MagicEditor(QTextEdit):
                 if len(self.get_rest_of_line()) > 0:
                     return True
 
-            if sleep:
-                QApplication.processEvents()
-                time.sleep(0.01 + random.random() * 0.1)
-        return False
+            QApplication.processEvents()
+            #time.sleep(self.delay + random.random() * 10 * self.delay)
+            delay = int(self.delay) + random.randint(0, int(self.delay))
+            QTimer.singleShot(delay, self.complete_line)
+
 
     def get_rest_of_line(self):
         count = self.count
@@ -119,11 +131,18 @@ class MagicEditor(QTextEdit):
         return current_line
 
     def append_next_char(self):
+        # now = self.toPlainText()
+        # result = re.sub(r"[ñ´çº]", "", self.toPlainText())
+        # if result != now:
+        #     self.setText(result)
+        #     self.moveCursor(QtGui.QTextCursor.End)
+
         # self.insertPlainText(self.code[self.count])
         # TODO: once filtered ñ use insertPlainText
+        self.count += 1
         self.setText(self.code[:self.count])
         self.moveCursor(QtGui.QTextCursor.End)
-        self.count += 1
+
 
     def show_all_code(self):
         # is control pressed? check
@@ -192,12 +211,18 @@ class MagicEditor(QTextEdit):
         elif self.mode == 0:
 
             if e.key() == Qt.Key_Tab:
-                self.autocomplete()
+                self.tab_pressed()
                 # self.setText(self.toPlainText() + "    ")
                 # self.moveCursor(QtGui.QTextCursor.End)
-
+            elif e.key() == Qt.Key_Backspace:
+                self.suggestion = None
+                if self.get_current_line_text().endswith("    "):
+                    for i in range(4):
+                        self.textCursor().deletePreviousChar()
+                else:
+                    super().keyPressEvent(e)
             elif e.key() == Qt.Key_Return:
-                self.choosing = None
+                self.suggestion = None
                 if e.modifiers() == Qt.ControlModifier:
                     self.ctrl_enter.emit()
                 elif self.on_return_key(e):
@@ -205,61 +230,53 @@ class MagicEditor(QTextEdit):
                 else:
                     super().keyPressEvent(e)
             else:
-                self.choosing = None
-                self.candidates.clear()
+                self.suggestion = None
                 super().keyPressEvent(e)
         self.cursorPositionChanged.emit()
 
-    def autocomplete(self):
+    def tab_pressed(self):
 
         current_line = self.get_current_line_text()
+        current_words = re.split(r'\W+', self.toPlainText())
 
+        # it was jusr a tab
         if len(current_line) == 0 or current_line.endswith("    "):
             self.insertPlainText("    ")
-            self.choosing = None
+            self.moveCursor(QtGui.QTextCursor.End)
+            self.suggestion = None
             return
-
+        # it was just a tab
         if len(current_line) > 0 and current_line[-1] in " (:)":
-            self.choosing = None
+            self.suggestion = None
             return
 
-        if self.choosing is not None:
-            self.candidates.append(self.candidates.pop(0))
-            self.setText(self.toPlainText()[:-len(self.choosing)] + self.candidates[0])
-            self.moveCursor(QtGui.QTextCursor.End)
-            self.choosing = self.candidates[0]
-            return
+        if self.suggestion is None:
+            unfinished_word = re.split(r"[+\-*/= ]", current_line)
+            if len(unfinished_word) == 0 or len(unfinished_word[-1]) == 0:
+                return
+            unfinished_word = unfinished_word[-1]
+            word_set = list(set(current_words + self.highlighter.get_keywords() + self.autocomplete_words))
 
-        words = re.split(r'\W+', self.toPlainText())
+            # We want unfinished_word to be the last one
+            if unfinished_word in word_set:
+                word_set.remove(unfinished_word)
 
-        if len(words) == 0:
-            return
+            self.candidates = [word for word in word_set if word.startswith(unfinished_word)]
+            if len(self.candidates) == 0:
+                return
+            elif len(self.candidates) == 1:
+                self.insertPlainText(self.candidates[0][len(unfinished_word):])
+                self.moveCursor(QtGui.QTextCursor.End)
+                return
+            else:
+                self.suggestion = unfinished_word
 
-        last_word = words.pop(-1)
+        for _ in range(len(self.suggestion)):
+            self.textCursor().deletePreviousChar()
+        self.candidates.append(self.suggestion)
+        self.suggestion = self.candidates.pop(0)
+        self.insertPlainText(self.suggestion)
 
-        if last_word == "":
-            return
-
-        keywords = list(set(self.highlighter.get_keywords() + words))
-        # I want the last word to be the last one
-        # because otherwise could pop up at the
-        # beginning, and it would be annoying
-
-        keywords.append(last_word)
-        if "" in keywords:
-            keywords.remove("")
-
-        self.candidates.clear()
-        for keyword in keywords:
-            if keyword.startswith(last_word):
-                self.candidates.append(keyword)
-        if len(self.candidates) == 1:
-            self.setText(self.toPlainText()[:-len(last_word)] + self.candidates[0])
-            self.moveCursor(QtGui.QTextCursor.End)
-        elif len(self.candidates) > 1:
-            self.choosing = self.candidates[0]
-            self.setText(self.toPlainText()[:-len(last_word)] + self.candidates[0])
-            self.moveCursor(QtGui.QTextCursor.End)
 
     def get_next_line(self):
         count = self.count
@@ -285,12 +302,11 @@ class PythonEditor(MagicEditor):
         current_line = self.get_current_line()
         spaces = self.get_spaces(current_line)
         if current_line.endswith(":"):
-
             if self.textCursor().positionInBlock() == len(current_line):
                 self.insertPlainText("\n" + " " * (spaces + 4))
-            else:
-                super().keyPressEvent(e)
-            return True
+                return True
+            return False
+
         elif current_line.startswith(" "):
             if current_line.strip():
                 self.insertPlainText("\n" + " " * spaces)
@@ -412,6 +428,5 @@ class LanguageEditor(QWidget):
         return self.text_edit.code
 
     def get_remaining_chars(self):
-        print("wtf", self.text_edit.count, len(self.get_text()))
         diff = len(self.get_code()) - self.text_edit.count
         return diff

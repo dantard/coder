@@ -53,7 +53,8 @@ class PythonHighlighter(SyntaxHighlighter):
                           'from', 'global', 'del', 'print', 'None', 'pass', 'class', 'as',
                           'break', 'while', 'await', 'async', 'range', 'is', 'True', 'lambda',
                           'False', 'in', 'import', 'except', 'continue', 'and', 'raise', 'with',
-                          'if', 'try', 'for', 'else', 'not', 'def', "input", "int", "float", "str", "list", "dict",
+                          'if', 'try', 'for', 'else', 'not', 'def', "input", "int", "float", "str",
+                          "list", "dict", "input", "print", "open", "read", "write", "close", "split",
                           ])
 
 

@@ -4,7 +4,10 @@ import re
 import sys
 import time
 import typing
+from fileinput import filename
+
 from easyconfig2.easyconfig import EasyConfig2 as EasyConfig
+from easyconfig2.easynodes import EasySlider
 
 import resources  # noqa
 import yaml
@@ -36,19 +39,25 @@ class CustomTabBar(QTabBar):
 
 
 class DynamicComboBox(QComboBox):
+    item_selected = pyqtSignal()
+
     def __init__(self, dir, parent=None):
         super().__init__(parent)
         self.dir = dir
-        self.addItem("Select program")
+        self.addItem("---")
 
     def showPopup(self):
         self.populate()
         super().showPopup()
 
+    def hidePopup(self):
+        super().hidePopup()
+        QTimer.singleShot(0, self.item_selected.emit)
+
     def populate(self):
         self.blockSignals(True)
         self.clear()  # Clear the current items
-        self.addItem("Select program")
+        self.addItem("---")
         files = list(os.listdir("progs"))
         files.sort()
         self.addItems(files)
@@ -66,6 +75,8 @@ class MainWindow(QMainWindow):
             #self.apply_color_scheme(self.cfg_dark.get_value()==1)
             self.language_editor.set_font_size(self.cfg_font_size.get_value() + 10)
             self.console_widget.set_font_size(self.cfg_font_size.get_value() + 10)
+            self.language_editor.text_edit.append_autocomplete(self.cfg_autocomplete.get("").split(";"), True)
+            self.language_editor.text_edit.set_delay(self.cfg_delay.get())
 
     def set_font_size(self, delta):
         current_font_size = self.language_editor.text_edit.font().pixelSize()
@@ -81,10 +92,18 @@ class MainWindow(QMainWindow):
         self.console_widget.set_font_size(x)
         #self.cfg_font_size.set_value(x - 10)
 
-    def __init__(self, language_editor, console):
+    def __init__(self):
         super().__init__()
-
         self.config = EasyConfig(immediate=True)
+
+        if len(sys.argv) == 2:
+            editor = PascalEditor(PascalHighlighter())
+            console = Console()
+        else:
+            editor = PythonEditor(PythonHighlighter())
+            console = Jupyter()
+
+        self.language_editor = LanguageEditor(editor)
 
         general = self.config.root()
         self.cfg_dark = general.addCombobox("dark", pretty="Mode", items=["Light", "Dark"], default=0)
@@ -102,12 +121,16 @@ class MainWindow(QMainWindow):
         self.cfg_slides_path = general.addFolderChoice("slides_path", pretty="Slides Path",
                                                        default=str(os.getcwd()) + os.sep + "slides" + os.sep)
         self.cfg_progs_path = general.addFolderChoice("progs_path", pretty="Programs Path", default=str(os.getcwd()) + os.sep + "progs" + os.sep)
-
+        self.cfg_autocomplete = general.addString("autocomplete", pretty="Autocomplete", default="")
+        self.cfg_delay = general.add_child(EasySlider("delay", pretty="Delay", min=0, max=100, default=25, den=1, show_value=True, suffix=" ms"))
         console.set_config(self.config)
 
         self.config.load("spice.yaml")
 
+        editor.set_delay(self.cfg_delay.get())
+
         console.config_read()
+        editor.append_autocomplete(self.cfg_autocomplete.get("").split(";"))
 
         self.font_size = self.cfg_font_size.get_value() + 10
         self.toolbar_float = self.cfg_tb_float.get_value()
@@ -131,7 +154,7 @@ class MainWindow(QMainWindow):
         splitter = QSplitter(Qt.Horizontal)
 
         self.prog_cb = DynamicComboBox("progs")
-        self.prog_cb.currentTextChanged.connect(self.load_program)
+        self.prog_cb.item_selected.connect(self.load_program)
         font = QFont("Monospace")
         font.setStyleHint(QFont.TypeWriter)
         font.setPixelSize(16)
@@ -142,10 +165,11 @@ class MainWindow(QMainWindow):
         left_layout = QVBoxLayout()
 
         # self.text_edit = LanguageEditor(PythonEditor(PythonHighlighter()))
-        self.language_editor = language_editor
         self.language_editor.ctrl_enter.connect(self.execute_code)
         self.language_editor.info.connect(self.update_status_bar)
         self.language_editor.set_font_size(self.cfg_font_size.get_value()+10)
+
+        console.done.connect(self.language_editor.text_edit.setFocus)
 
         bar = QToolBar()
         a1 = bar.addAction("Play", self.execute_code)
@@ -497,12 +521,13 @@ class MainWindow(QMainWindow):
         self.tabs.setCurrentIndex(0)
         self.language_editor.setFocus()
 
-    def load_program(self, filename):
-        if filename == "Select program":
+    def load_program(self):
+        if self.prog_cb.currentIndex() == 0:
             self.clear_all()
             return
 
-        with open("progs" + os.sep + filename) as f:
+        file_name = self.prog_cb.currentText()
+        with open("progs" + os.sep + file_name) as f:
             #    self.text_edit.setPlainText(f.read())
             self.language_editor.set_code(f.read())
             self.console_widget.clear()
@@ -514,11 +539,7 @@ class MainWindow(QMainWindow):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    if len(sys.argv) > 1:
-        window = MainWindow(LanguageEditor(PascalEditor(PascalHighlighter())), Console())
-    else:
-        window = MainWindow(LanguageEditor(PythonEditor(PythonHighlighter())), Jupyter())
-
+    window = MainWindow()
     window.show()
 
     sys.exit(app.exec_())

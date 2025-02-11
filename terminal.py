@@ -1,7 +1,9 @@
 import os
+import re
 import sys
+import time
 
-from PyQt5.QtCore import QTimer, Qt
+from PyQt5.QtCore import QTimer, Qt, pyqtSignal
 from PyQt5.QtGui import QFont
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QApplication
 from easyconfig2.easyconfig import EasyConfig2
@@ -13,6 +15,8 @@ from termqt import Terminal
 # from qtpyTerminal import qtpyTerminal
 
 class SpiceTerminal(QWidget):
+    done = pyqtSignal()
+
     def __init__(self):
         super().__init__()
         self.keep_code = False
@@ -74,6 +78,9 @@ class Jupyter(SpiceTerminal):
         layout = QVBoxLayout()
         layout.addWidget(self.jupyter_widget)
         self.setLayout(layout)
+        self.timer = QTimer()
+        self.timer.setSingleShot(True)
+        self.timer.timeout.connect(self.done.emit)
 
     def set_dark_mode(self, value):
         if value:
@@ -91,6 +98,12 @@ class Jupyter(SpiceTerminal):
             if text.endswith("   ...: "):
                 if clear:
                     self.editor.clear()
+
+            pattern = r"In \[\d+\]:"
+            if re.search(pattern, text[-10:]):
+                self.timer.stop()
+                self.timer.start(250)
+
 
         self.editor.textChanged.connect(filtering)
         # self.jupyter_widget._control.setFocus()
@@ -122,8 +135,7 @@ import platform
 class Console(SpiceTerminal):
     def __init__(self):
         super().__init__()
-        self.terminal = Terminal(400, 600)
-
+        self.terminal = Terminal(400, 600, font_size=18)
         layout = QVBoxLayout()
         layout.addWidget(self.terminal)
         self.setLayout(layout)
@@ -196,6 +208,18 @@ class Console(SpiceTerminal):
 
     def get_file_extension(self):
         return self.file_extension.get_item(self.file_extension.get(0))
+
+    def set_font_size(self, size):
+        self.terminal.font_size = int(size*0.75)
+        font = QFont("Monospace")
+        font.setStyleHint(QFont.Monospace)
+        font.setPointSize(size)
+        print("font size", size)
+        self.terminal.set_font(font)
+        self.terminal.input("clear\r\n".encode("utf-8"))
+
+    def resizeEvent(self, a0):
+        self.terminal.set_canvas_size(self.width(), self.height())
 
 # class Console2(SpiceTerminal):
 #     def __init__(self):
