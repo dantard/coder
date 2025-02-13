@@ -169,9 +169,7 @@ class MagicEditor(QTextEdit):
         self.setFocusPolicy(Qt.StrongFocus)
 
         if e.key() == Qt.Key_Escape:
-            self.set_mode(1 if self.mode == 0 else 0)
-
-            return
+            self.set_mode(0 if self.mode==1 else 0)
 
         if self.mode == 1:
             if e.key() == Qt.Key_Down:
