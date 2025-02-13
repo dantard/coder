@@ -354,6 +354,8 @@ class LanguageEditor(QWidget):
         self.text_edit.info.connect(self.info.emit)
         # self.text_edit.info.connect(self.update_status_bar)
         self.text_edit.setPlaceholderText("Write Python code here...")
+        #self.text_edit.setStyleSheet("QTextEdit {QTextEdit::placeholder { font-size: 16px; }")
+
         # self.line_number_area.setStyleSheet("QTextEdit { color: #a0a0a0;}")
         self.line_number_area.setContentsMargins(0, 0, 0, 0)
         self.text_edit.setContentsMargins(0, 0, 0, 0)
@@ -366,6 +368,7 @@ class LanguageEditor(QWidget):
         self.set_font_size(font_size)
 
     def set_font_size(self, font_size):
+        print("font size", font_size)
         font = QFont("Monospace")
         font.setStyleHint(QFont.TypeWriter)
         font.setPixelSize(font_size)

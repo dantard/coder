@@ -20,8 +20,6 @@ class SyntaxHighlighter(QSyntaxHighlighter):
         keyword_format.setForeground(self.keyword_color)
         keyword_format.setFontWeight(QFont.Bold)
 
-        # print(set(keywords))
-
         self.highlighting_rules += [(f"\\b{k}\\b", keyword_format) for k in self.keywords]
 
         string_format = QTextCharFormat()

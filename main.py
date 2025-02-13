@@ -23,6 +23,7 @@ from qtconsole.manager import QtKernelManager
 
 from dialogs import Author
 from editor import PythonEditor, LanguageEditor, PascalEditor
+from editor_widget import EditorWidget
 from highlighter import PythonHighlighter, PascalHighlighter
 from terminal import Jupyter, Console
 from textract import Slides
@@ -38,72 +39,74 @@ class CustomTabBar(QTabBar):
         self.a = QPushButton(self)
 
 
-class DynamicComboBox(QComboBox):
-    item_selected = pyqtSignal()
-
-    def __init__(self, dir, parent=None):
-        super().__init__(parent)
-        self.dir = dir
-        self.addItem("---")
-
-    def showPopup(self):
-        self.populate()
-        super().showPopup()
-
-    def hidePopup(self):
-        super().hidePopup()
-        QTimer.singleShot(0, self.item_selected.emit)
-
-    def populate(self):
-        self.blockSignals(True)
-        self.clear()  # Clear the current items
-        self.addItem("---")
-        files = list(os.listdir("progs"))
-        files.sort()
-        self.addItems(files)
-        self.blockSignals(False)
-
-
 class MainWindow(QMainWindow):
 
     def edit_config(self):
         if self.config.edit(min_width=400, min_height=400):
             self.config.save("spice.yaml")
-            for i in range(1,self.tabs.count()):
-                self.tabs.widget(i).set_toolbar_float(self.cfg_tb_float.get_value()==1, self.tabs)
-            self.update_toolbar_position()
-            #self.apply_color_scheme(self.cfg_dark.get_value()==1)
-            self.language_editor.set_font_size(self.cfg_font_size.get_value() + 10)
-            self.console_widget.set_font_size(self.cfg_font_size.get_value() + 10)
-            self.language_editor.text_edit.append_autocomplete(self.cfg_autocomplete.get("").split(";"), True)
-            self.language_editor.text_edit.set_delay(self.cfg_delay.get())
+            self.apply_config()
+
+    def apply_config(self):
+        for i in range(1, self.tabs.count()):
+            self.tabs.widget(i).set_toolbar_float(self.cfg_tb_float.get_value() == 1, self.tabs)
+        self.update_toolbar_position()
+        #
+        for i in range(self.editors_tabs.count()):
+            editor = self.editors_tabs.widget(i)
+            editor.set_dark_mode(self.cfg_dark.get_value() == 1)
+            editor.set_font_size(self.cfg_font_size.get_value() + 10)
+            editor.append_autocomplete(self.cfg_autocomplete.get("").split(";"), True)
+            editor.set_delay(self.cfg_delay.get())
+        self.console_widget.update_config()
 
     def set_font_size(self, delta):
-        current_font_size = self.language_editor.text_edit.font().pixelSize()
+
+        current_font_size = self.editors_tabs.currentWidget().get_font_size()
+        print("set_font_size", delta, current_font_size)
         goal = current_font_size + delta
         if goal < 10 or goal > 32:
             return
-        self.language_editor.set_font_size(goal)
+        for i in range(self.editors_tabs.count()):
+            self.editors_tabs.widget(i).set_font_size(goal)
         self.console_widget.set_font_size(goal)
         self.cfg_font_size.set_value(goal - 10)
 
     def change_font_size(self, x):
-        self.language_editor.set_font_size(x)
+        for i in range(1, self.editors_tabs.count()):
+            self.editors_tabs.widget(i).set_font_size(x)
         self.console_widget.set_font_size(x)
-        #self.cfg_font_size.set_value(x - 10)
+
+    def get_editor(self):
+        if len(sys.argv) == 2:
+            editor = LanguageEditor(PascalEditor(PascalHighlighter()))
+        else:
+            editor = LanguageEditor(PythonEditor(PythonHighlighter()))
+        return editor
+
+    def remove_editor_tab(self, index):
+        if index > 0:
+            self.editors_tabs.removeTab(index)
+        else:
+            self.editors_tabs.widget(0).clear()
+
+    def new_editor_tab(self, console):
+        editor = EditorWidget(self.get_editor(), console, self.config)
+        self.editors_tabs.addTab(editor, "Code")
+        editor.set_dark_mode(self.cfg_dark.get_value() == 1)
+        self.editors_tabs.setCurrentWidget(editor)
+        self.apply_config()
+
+    def editor_tab_changed(self, index):
+        pass
 
     def __init__(self):
         super().__init__()
         self.config = EasyConfig(immediate=True)
 
         if len(sys.argv) == 2:
-            editor = PascalEditor(PascalHighlighter())
-            console = Console()
+            self.console_widget = Console()
         else:
-            editor = PythonEditor(PythonHighlighter())
-            console = Jupyter()
-
-        self.language_editor = LanguageEditor(editor)
+            self.console_widget = Jupyter()
 
         general = self.config.root()
         self.cfg_dark = general.addCombobox("dark", pretty="Mode", items=["Light", "Dark"], default=0)
@@ -111,101 +114,66 @@ class MainWindow(QMainWindow):
 
         self.cfg_font_size = general.addCombobox("font_size", pretty="Font size", items=[str(i) for i in range(10, 33)],
                                                  default=0)
-        self.cfg_font_size.value_changed.connect(lambda x: self.change_font_size(int(x.get()+10)))
-
-        self.cfg_tb_float = general.addCombobox("tb_float", pretty="Toolbar mode", items=["Fixed", "Float"], default=0)
+        self.cfg_font_size.value_changed.connect(lambda x: self.change_font_size(int(x.get() + 10)))
+        self.cfg_tb_float = general.addCombobox("tb_float",
+                                                pretty="Toolbar mode",
+                                                items=["Fixed", "Float"],
+                                                default=0)
         hidden = self.config.root().addHidden("parameters")
         self.cfg_last = hidden.addList("last", default=[])
-        self.cfg_show_sb = general.addCheckbox("show_tb", pretty="Show Toolbar", default=False)
-        self.cfg_open_fullscreen = general.addCheckbox("open_fullscreen", pretty="Open Fullscreen", default=False)
-        self.cfg_slides_path = general.addFolderChoice("slides_path", pretty="Slides Path",
+        self.cfg_show_sb = general.addCheckbox("show_tb",
+                                               pretty="Show Toolbar",
+                                               default=False)
+        self.cfg_open_fullscreen = general.addCheckbox("open_fullscreen",
+                                                       pretty="Open Fullscreen",
+                                                       default=False)
+        self.cfg_slides_path = general.addFolderChoice("slides_path",
+                                                       pretty="Slides Path",
                                                        default=str(os.getcwd()) + os.sep + "slides" + os.sep)
-        self.cfg_progs_path = general.addFolderChoice("progs_path", pretty="Programs Path", default=str(os.getcwd()) + os.sep + "progs" + os.sep)
-        self.cfg_autocomplete = general.addString("autocomplete", pretty="Autocomplete", default="")
-        self.cfg_delay = general.add_child(EasySlider("delay", pretty="Delay", min=0, max=100, default=25, den=1, show_value=True, suffix=" ms"))
-        console.set_config(self.config)
+        self.cfg_progs_path = general.addFolderChoice("progs_path",
+                                                      pretty="Programs Path",
+                                                      default=str(os.getcwd()) + os.sep + "progs" + os.sep)
+        self.cfg_autocomplete = general.addString("autocomplete",
+                                                  pretty="Autocomplete",
+                                                  default="")
+        self.cfg_delay = general.addSlider("delay",
+                                           pretty="Delay",
+                                           min=0, max=100,
+                                           default=25,
+                                           den=1,
+                                           show_value=True,
+                                           suffix=" ms")
 
+        self.console_widget.set_config(self.config)
         self.config.load("spice.yaml")
-
-        editor.set_delay(self.cfg_delay.get())
-
-        console.config_read()
-        editor.append_autocomplete(self.cfg_autocomplete.get("").split(";"))
-
-        self.font_size = self.cfg_font_size.get_value() + 10
-        self.toolbar_float = self.cfg_tb_float.get_value()
-        self.dark = self.cfg_dark.get_value() == 1
-        self.setWindowTitle("Spice")
+        self.console_widget.config_read()
+        self.dark = False
 
         # SPICE – Slides, Python, Interactive Creation, and Education
         # slides and python for interactive and creative education
 
-        # self.resize(1000, 600)
-
         self.tabs = QTabWidget()
-
-        # put tabs bottom
         self.tabs.setTabPosition(QTabWidget.South)
         self.tabs.setTabsClosable(True)
         self.tabs.tabCloseRequested.connect(self.close_tab_requested)
         self.tabs.currentChanged.connect(self.tab_changed)
-        tab_bar = self.tabs.tabBar()
+        self.tabs.tabBar().setTabButton(0, QTabBar.ButtonPosition.RightSide, None)
 
-        splitter = QSplitter(Qt.Horizontal)
+        self.editors_tabs = QTabWidget()
+        self.editors_tabs.addTab(EditorWidget(self.get_editor(), self.console_widget, self.config), "Code")
+        self.editors_tabs.setTabsClosable(True)
+        self.editors_tabs.tabCloseRequested.connect(self.remove_editor_tab)
+        self.editors_tabs.currentChanged.connect(self.editor_tab_changed)
 
-        self.prog_cb = DynamicComboBox("progs")
-        self.prog_cb.item_selected.connect(self.load_program)
-        font = QFont("Monospace")
-        font.setStyleHint(QFont.TypeWriter)
-        font.setPixelSize(16)
-        self.prog_cb.setFont(font)
+        helper = QWidget()
+        helper.setLayout(QVBoxLayout())
+        helper.layout().addWidget(self.editors_tabs)
 
-        # Left side layout
-        left_widget = QWidget()
-        left_layout = QVBoxLayout()
+        self.splitter = QSplitter(Qt.Horizontal)
+        self.splitter.addWidget(helper)
+        self.splitter.addWidget(self.console_widget)
+        self.tabs.addTab(self.splitter, "Code Execution")
 
-        # self.text_edit = LanguageEditor(PythonEditor(PythonHighlighter()))
-        self.language_editor.ctrl_enter.connect(self.execute_code)
-        self.language_editor.info.connect(self.update_status_bar)
-        self.language_editor.set_font_size(self.cfg_font_size.get_value()+10)
-
-        console.done.connect(self.language_editor.text_edit.setFocus)
-
-        bar = QToolBar()
-        a1 = bar.addAction("Play", self.execute_code)
-        a2 = bar.addAction("Clear", self.clear_all)
-        a3 = bar.addAction("Show", self.language_editor.show_code)
-
-        self.keep_banner = bar.addAction("#")
-        self.keep_banner.setCheckable(True)
-        self.keep_banner.setChecked(False)
-        self.keep_banner.triggered.connect(lambda: self.console_widget.set_keep_code(self.keep_banner.isChecked()))
-
-        self.text_edit_group = [a1, a2, a3, self.keep_banner]
-
-        left_layout.addWidget(bar)
-        left_layout.addWidget(self.prog_cb)
-        left_layout.addWidget(self.language_editor)
-
-        self.sb = QStatusBar()
-        if self.cfg_show_sb.get_value():
-            left_layout.addWidget(self.sb)
-
-        left_widget.setLayout(left_layout)
-
-        left_layout.setSpacing(0)
-        left_layout.setContentsMargins(0, 0, 0, 0)
-
-        splitter.addWidget(left_widget)
-
-        # Right side: RichJupyterWidget
-        self.console_widget = console
-        splitter.addWidget(self.console_widget)
-        self.console_widget.set_font_size(self.cfg_font_size.get_value()+10)
-
-
-        self.tabs.addTab(splitter, "Code Execution")
-        tab_bar.setTabButton(0, QTabBar.ButtonPosition.RightSide, None)
         helper = QWidget()
         helper.setContentsMargins(0, 0, 0, 0)
         helper.setLayout(QVBoxLayout())
@@ -213,14 +181,12 @@ class MainWindow(QMainWindow):
         helper.layout().setSpacing(0)
         helper.layout().addWidget(self.tabs)
 
-        self.setCentralWidget(helper)
-
         menu = self.menuBar()
         file = menu.addMenu("File")
         file.addAction("Open", self.open_slides)
         m1 = file.addMenu("Slides")
         file.addSeparator()
-        file.addAction("Save As", self.save_as)
+        file.addAction("Save Code", self.save_as)
         file.addSeparator()
         file.addAction("Exit", self.close)
         m3 = menu.addMenu("Edit")
@@ -247,31 +213,11 @@ class MainWindow(QMainWindow):
         q = QShortcut("Ctrl+-", self)
         q.activated.connect(lambda: self.set_font_size(-1))
 
-        q = QShortcut("Ctrl+K", self)
-        q.activated.connect(self.clear_all)
-
-        q = QShortcut("Ctrl+S", self)
-        q.activated.connect(self.save_as)
+        q = QShortcut("Ctrl+N", self)
+        q.activated.connect(lambda: self.new_editor_tab(self.console_widget))
 
         q = QShortcut("Ctrl+L", self)
         q.activated.connect(self.toggle_fullscreen)
-
-        q = QShortcut("Ctrl+O", self)
-        q.activated.connect(self.open_slides)
-
-        q = QShortcut("Ctrl+Tab", self)
-        q.activated.connect(self.toggle_focus)
-
-        q = QShortcut("Ctrl+F", self)
-
-        #        q.activated.connect(self.text_edit.format_code)
-
-        def resize():
-            splitter.setSizes([int(self.width() * 0.5), int(self.width() * 0.5)])
-
-        QTimer.singleShot(100, resize)
-
-        self.tab_changed(0)
 
         for elem in self.cfg_last.get_value():
             self.open_slides(elem.get("filename"), elem.get("page", 0))
@@ -279,7 +225,16 @@ class MainWindow(QMainWindow):
         if self.cfg_open_fullscreen.get_value():
             self.toggle_fullscreen()
 
-        QTimer.singleShot(100, self.update_toolbar_position)
+        self.setWindowTitle("Spice")
+        self.setCentralWidget(helper)
+
+        QTimer.singleShot(10, self.finish_config)
+        self.console_widget.done.connect(self.editors_tabs.currentWidget().language_editor.text_edit.setFocus)
+
+    def finish_config(self):
+        self.update_toolbar_position()
+        self.splitter.setSizes([int(self.width() * 0.5), int(self.width() * 0.5)])
+        self.apply_config()
 
     def toggle_color_scheme(self):
         self.dark = not self.dark
@@ -288,55 +243,11 @@ class MainWindow(QMainWindow):
 
     def apply_color_scheme(self, dark):
         self.console_widget.set_dark_mode(dark)
-        self.language_editor.set_dark_mode(dark)
+        for editor in range(self.editors_tabs.count()):
+            self.editors_tabs.widget(editor).set_dark_mode(dark)
 
         if self.tabs.currentIndex() == 0:
             self.setStyleSheet("background-color: #000000; color: white" if dark else "")
-
-        color = Qt.white if dark else Qt.black
-        a1, a2, a3, a4 = self.text_edit_group
-        a1.setIcon(QIcon(self.color(":/icons/play.svg", color)))
-        a2.setIcon(QIcon(self.color(":/icons/refresh.svg", color)))
-        a3.setIcon(QIcon(self.color(":/icons/download.svg", color)))
-        a4.setIcon(QIcon(self.color(":/icons/hash.svg", color)))
-
-    def color(self, icon_path, color):
-        # Load the pixmap from the icon path
-        pixmap = QPixmap(icon_path)
-
-        # Create an empty QPixmap with the same size
-        colored_pixmap = QPixmap(pixmap.size())
-        colored_pixmap.fill(Qt.transparent)
-
-        # Paint the new color onto the QPixmap
-        painter = QPainter(colored_pixmap)
-        painter.drawPixmap(0, 0, pixmap)
-        painter.setCompositionMode(QPainter.CompositionMode_SourceIn)
-        painter.fillRect(colored_pixmap.rect(), QColor(color))
-        painter.end()
-        return colored_pixmap
-
-    def color2(self, icon_path, target_color="white"):
-        # Load the icon as a QImage
-        image = QImage(icon_path)
-
-        # Iterate through each pixel to recolor black pixels
-        for y in range(image.height()):
-            for x in range(image.width()):
-                color = QColor(image.pixel(x, y))
-                if color.red() == 0 and color.green() == 0 and color.blue() == 0:  # Black pixel
-                    image.setPixelColor(x, y, QColor(target_color))
-
-        # Convert back to QPixmap
-        pixmap = QPixmap.fromImage(image)
-        return pixmap
-
-    def set_color(self, color):
-        for i, elem in enumerate(self.color_group):
-            elem.blockSignals(True)
-            elem.setChecked(i == color)
-            elem.blockSignals(False)
-        self.tabs.currentWidget().set_color(color)
 
     def toggle_focus(self):
         if self.language_editor.hasFocus():
@@ -364,13 +275,7 @@ class MainWindow(QMainWindow):
         super().keyPressEvent(a0)
 
     def save_as(self):
-        ext = self.console_widget.get_file_extension()
-        path = self.cfg_progs_path.get_value() + os.sep
-        filename, ok = QFileDialog.getSaveFileName(self, "Save code", filter="Language files (*"+ext+")", directory=path)
-        if ok:
-            filename = filename.replace(ext, "") + ext
-            with open(filename, "w") as f:
-                f.write(self.language_editor.get_text())
+        self.editors_tabs.currentWidget().save_program()
 
     def update_status_bar(self, x, timeout):
         if self.cfg_show_sb.get_value():
@@ -407,17 +312,10 @@ class MainWindow(QMainWindow):
 
             if self.isFullScreen():
                 toolbar.setGeometry(self.width() - toolbar.sizeHint().width() - 20, self.height() - 34,
-                                    toolbar.sizeHint().width(),
-                                    40)
+                                    toolbar.sizeHint().width(), 40)
             else:
                 toolbar.setGeometry(self.width() - toolbar.sizeHint().width() - 20, self.height() - 56,
-                                    toolbar.sizeHint().width(),
-                                    40)
-
-    def clear_all(self):
-        self.console_widget.clear()
-        self.language_editor.clear()
-        self.prog_cb.setCurrentIndex(0)
+                                    toolbar.sizeHint().width(), 40)
 
     def tab_changed(self, index):
         for i in range(1, self.tabs.count()):
@@ -462,48 +360,48 @@ class MainWindow(QMainWindow):
             if isinstance(widget, Slides):
                 last.append({"filename": widget.filename, "page": widget.page})
         self.cfg_last.set_value(last)
-
         self.config.save("spice.yaml")
 
-    def contextMenuEvent(self, event):
-        menu = QMenu(self)
-        m1 = menu.addAction("Fullscreen")
-        menu.addSeparator()
-        m1.setCheckable(True)
-        m1.setChecked(self.isFullScreen())
-        m1.triggered.connect(self.toggle_fullscreen)
-
-        if os.path.exists("slides"):
-            m2 = menu.addMenu("Slides")
-
-            def fill():
-                pwd = os.getcwd()
-                for filename in os.listdir("slides"):
-                    m2.addAction(filename, lambda x=filename, y=filename: self.open_slides(pwd + os.sep + "slisdes"  + os.sep + y))
-
-            m2.aboutToShow.connect(fill)
-
-        menu.addAction("Open", self.open_slides)
-        menu.addSeparator()
-        m3 = menu.addMenu("Mode")
-
-        # NONE = 0
-        # POINTER = 1
-        # WRITING = 2
-        # ERASING = 3
-        # RECTANGLES = 4
-        # ELLIPSES = 5
-
-        m3.addAction("None", lambda: self.set_writing_mode(0))
-        m3.addAction("Pointer", lambda: self.set_writing_mode(1))
-        m3.addAction("Write", lambda: self.set_writing_mode(2))
-        m3.addAction("Erase", lambda: self.set_writing_mode(3))
-        m3.addAction("Rectangles", lambda: self.set_writing_mode(4))
-        m3.addAction("Ellipses", lambda: self.set_writing_mode(5))
-
-        menu.addAction("Exit", self.close)
-
-        menu.exec_(event.globalPos())
+    # def contextMenuEvent(self, event):
+    #     menu = QMenu(self)
+    #     m1 = menu.addAction("Fullscreen")
+    #     menu.addSeparator()
+    #     m1.setCheckable(True)
+    #     m1.setChecked(self.isFullScreen())
+    #     m1.triggered.connect(self.toggle_fullscreen)
+    #
+    #     if os.path.exists("slides"):
+    #         m2 = menu.addMenu("Slides")
+    #
+    #         def fill():
+    #             pwd = os.getcwd()
+    #             for filename in os.listdir("slides"):
+    #                 m2.addAction(filename,
+    #                              lambda x=filename, y=filename: self.open_slides(pwd + os.sep + "slides" + os.sep + y))
+    #
+    #         m2.aboutToShow.connect(fill)
+    #
+    #     menu.addAction("Open", self.open_slides)
+    #     menu.addSeparator()
+    #     m3 = menu.addMenu("Mode")
+    #
+    #     # NONE = 0
+    #     # POINTER = 1
+    #     # WRITING = 2
+    #     # ERASING = 3
+    #     # RECTANGLES = 4
+    #     # ELLIPSES = 5
+    #
+    #     m3.addAction("None", lambda: self.set_writing_mode(0))
+    #     m3.addAction("Pointer", lambda: self.set_writing_mode(1))
+    #     m3.addAction("Write", lambda: self.set_writing_mode(2))
+    #     m3.addAction("Erase", lambda: self.set_writing_mode(3))
+    #     m3.addAction("Rectangles", lambda: self.set_writing_mode(4))
+    #     m3.addAction("Ellipses", lambda: self.set_writing_mode(5))
+    #
+    #     menu.addAction("Exit", self.close)
+    #
+    #     menu.exec_(event.globalPos())
 
     def toggle_fullscreen(self):
         if self.isFullScreen():
@@ -515,26 +413,12 @@ class MainWindow(QMainWindow):
         self.cfg_open_fullscreen.set_value(self.isFullScreen())
 
     def code_from_slide(self, code):
-        self.language_editor.set_text("")
-        self.language_editor.set_code(code)
-        self.language_editor.set_mode(1)
+        editor = self.editors_tabs.currentWidget()
+        editor.language_editor.set_text("")
+        editor.language_editor.set_code(code)
+        editor.language_editor.set_mode(1)
+        editor.language_editor.setFocus()
         self.tabs.setCurrentIndex(0)
-        self.language_editor.setFocus()
-
-    def load_program(self):
-        if self.prog_cb.currentIndex() == 0:
-            self.clear_all()
-            return
-
-        file_name = self.prog_cb.currentText()
-        with open("progs" + os.sep + file_name) as f:
-            #    self.text_edit.setPlainText(f.read())
-            self.language_editor.set_code(f.read())
-            self.console_widget.clear()
-
-    def execute_code(self):
-        self.language_editor.format_code()
-        self.console_widget.execute(self.language_editor.get_text(), not self.keep_banner.isChecked())
 
 
 if __name__ == "__main__":

@@ -15,3 +15,19 @@ def create_cursor_image(size=30):
     painter.end()
 
     return cursor_image
+
+def color(icon_path, color):
+    # Load the pixmap from the icon path
+    pixmap = QPixmap(icon_path)
+
+    # Create an empty QPixmap with the same size
+    colored_pixmap = QPixmap(pixmap.size())
+    colored_pixmap.fill(Qt.transparent)
+
+    # Paint the new color onto the QPixmap
+    painter = QPainter(colored_pixmap)
+    painter.drawPixmap(0, 0, pixmap)
+    painter.setCompositionMode(QPainter.CompositionMode_SourceIn)
+    painter.fillRect(colored_pixmap.rect(), QColor(color))
+    painter.end()
+    return colored_pixmap

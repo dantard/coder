@@ -46,6 +46,10 @@ class SpiceTerminal(QWidget):
     def get_file_extension(self):
         return ".py"
 
+    def update_config(self):
+        pass
+
+
 class Jupyter(SpiceTerminal):
 
     def __init__(self, font_size=18):
@@ -82,6 +86,19 @@ class Jupyter(SpiceTerminal):
         self.timer.setSingleShot(True)
         self.timer.timeout.connect(self.done.emit)
 
+    def config_read(self):
+        pass
+
+    def update_config(self):
+        path = self.config.root().get_child("progs_path").get_value()
+        if path:
+            self.jupyter_widget.execute("cd " + path, hidden=True)
+
+        font_size = self.config.root().get_child("font_size").get_value()
+        if font_size:
+            self.set_font_size(font_size+10)
+
+
     def set_dark_mode(self, value):
         if value:
             self.jupyter_widget.set_default_style(colors='linux')
@@ -99,11 +116,10 @@ class Jupyter(SpiceTerminal):
                 if clear:
                     self.editor.clear()
 
-            pattern = r"In \[\d+\]:"
-            if re.search(pattern, text[-10:]):
-                self.timer.stop()
-                self.timer.start(250)
-
+            # pattern = r"In \[\d+\]:"
+            # if re.search(pattern, text[-10:]):
+            #     self.timer.stop()
+            #     self.timer.start(250)
 
         self.editor.textChanged.connect(filtering)
         # self.jupyter_widget._control.setFocus()
@@ -112,17 +128,39 @@ class Jupyter(SpiceTerminal):
         QApplication.processEvents()
 
         def run():
+
+
             if code.strip():
-                self.jupyter_widget.execute(code, interactive=True)
+                code_reset = code
+                self.jupyter_widget.execute(code_reset, interactive=True)
                 # if not self.keep_banner.isChecked():
                 #    self.jupyter_widget._control.clear()
 
+        clearer = '''
+        import sys
+        import os
+        import importlib
+
+        cwd = os.getcwd()
+
+        # Identify modules that are imported from the current directory
+        user_modules = [m for m in sys.modules if hasattr(
+            sys.modules[m], '__file__') and sys.modules[m].__file__ and sys.modules[m].__file__.startswith(cwd)]
+
+        for m in user_modules:
+            print("Reloading ", m, type(m))
+            importlib.reload(sys.modules[m])
+
+
+        '''
+        self.jupyter_widget.execute(clearer, hidden=True)
         QTimer.singleShot(100, run)
 
     def clear(self):
-        self.jupyter_widget.execute("%clear")
+        pass#self.jupyter_widget.execute("%clear")
 
     def set_font_size(self, font_size):
+        print("calling set_font_size", font_size)
         font = QFont("Monospace")
         font.setStyleHint(QFont.TypeWriter)
         font.setPixelSize(font_size)
@@ -210,7 +248,7 @@ class Console(SpiceTerminal):
         return self.file_extension.get_item(self.file_extension.get(0))
 
     def set_font_size(self, size):
-        self.terminal.font_size = int(size*0.75)
+        self.terminal.font_size = int(size * 0.75)
         font = QFont("Monospace")
         font.setStyleHint(QFont.Monospace)
         font.setPointSize(size)
