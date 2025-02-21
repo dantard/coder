@@ -1,14 +1,12 @@
 #!/usr/bin/env python
 import argparse
-import os
 import re
-import sys
+from io import BytesIO
 
 from PyPDF2 import PdfReader, PdfWriter
-from pygments.lexer import include
+from reportlab.lib.colors import white, Color
 from reportlab.pdfgen import canvas
-from reportlab.lib.colors import white, red, black, Color
-from io import BytesIO
+
 
 def add_text_to_page(page, text, position, page_size):
     packet = BytesIO()

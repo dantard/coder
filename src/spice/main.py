@@ -1,34 +1,18 @@
 import os
-import random
-import re
 import sys
-import time
-import typing
-from fileinput import filename
 
+from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtWidgets import QApplication, QMainWindow, QSplitter, QPushButton, QVBoxLayout, QWidget, \
+    QTabWidget, QFileDialog, QShortcut, QTabBar
 from easyconfig2.easyconfig import EasyConfig2 as EasyConfig
-from easyconfig2.easynodes import EasySlider
 
-import resources  # noqa
-import yaml
-from PyQt5 import QtGui, QtCore
-from PyQt5.QtWidgets import QApplication, QMainWindow, QSplitter, QTextEdit, QPushButton, QVBoxLayout, QWidget, \
-    QToolBar, QComboBox, QTabWidget, QMenu, QMenuBar, QFileDialog, QShortcut, QTabBar, QStatusBar, QHBoxLayout, \
-    QPlainTextEdit, QDialog
-from PyQt5.QtCore import Qt, QRegExp, pyqtSignal, QTimer, QEvent
-from PyQt5.QtGui import QTextCharFormat, QColor, QFont, QSyntaxHighlighter, QPixmap, QPainter, QCursor, QIcon, \
-    QTextCursor, QImage
-from qtconsole.rich_jupyter_widget import RichJupyterWidget
-from qtconsole.manager import QtKernelManager
-
-from dialogs import Author
-from editor import PythonEditor, LanguageEditor, PascalEditor
-from editor_widget import EditorWidget
-from highlighter import PythonHighlighter, PascalHighlighter
-from terminal import Jupyter, Console
-from textract import Slides
-
-from utils import create_cursor_image
+import spice.resources  # noqa
+from spice.dialogs import Author
+from spice.editor import PythonEditor, LanguageEditor, PascalEditor
+from spice.editor_widget import EditorWidget
+from spice.highlighter import PythonHighlighter, PascalHighlighter
+from spice.terminal import Jupyter, Console
+from spice.textract import Slides
 
 
 class CustomTabBar(QTabBar):
@@ -421,9 +405,12 @@ class MainWindow(QMainWindow):
         self.tabs.setCurrentIndex(0)
 
 
-if __name__ == "__main__":
+def main():
     app = QApplication(sys.argv)
     window = MainWindow()
     window.show()
 
     sys.exit(app.exec_())
+
+if __name__ == "__main__":
+    main()

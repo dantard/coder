@@ -1,9 +1,6 @@
-import os
-import re
 import sys
-import time
 
-from PyQt5.QtCore import QTimer, Qt, pyqtSignal
+from PyQt5.QtCore import QTimer, pyqtSignal
 from PyQt5.QtGui import QFont
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QApplication
 from easyconfig2.easyconfig import EasyConfig2

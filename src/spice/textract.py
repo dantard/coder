@@ -15,7 +15,7 @@ from PyQt5.QtWidgets import QMainWindow, QLabel, QSizePolicy, QApplication, QVBo
 from pymupdf import Rect
 from scipy.signal import savgol_filter
 
-from utils import create_cursor_image
+from spice.utils import create_cursor_image
 
 
 class Eraser(QGraphicsEllipseItem):

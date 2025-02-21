@@ -1,11 +1,11 @@
 import os
 
-from PyQt5.QtCore import pyqtSignal, QTimer, Qt
+from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont, QIcon
 from PyQt5.QtWidgets import QVBoxLayout, QToolBar, QStatusBar, QWidget, QComboBox, QShortcut, QTabWidget, QFileDialog
+from spice import utils
 
-import resources  # noqa
-import utils
+import spice.resources  # noqa
 
 
 class DynamicComboBox(QComboBox):
@@ -21,12 +21,13 @@ class DynamicComboBox(QComboBox):
         self.blockSignals(True)
         self.clear()  # Clear the current items
         self.addItem("[Free Coding]")
-        files = list(os.listdir(self.folder))
-        files = [f for f in files if os.path.isfile(os.path.join(self.folder, f))]
-        files.sort()
-        self.addItems(files)
-        if item:
-            self.setCurrentIndex(self.findText(item))
+        if os.path.exists(self.folder):
+            files = list(os.listdir(self.folder))
+            files = [f for f in files if os.path.isfile(os.path.join(self.folder, f))]
+            files.sort()
+            self.addItems(files)
+            if item:
+                self.setCurrentIndex(self.findText(item))
         self.blockSignals(False)
 
 
