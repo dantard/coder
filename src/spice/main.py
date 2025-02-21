@@ -39,8 +39,11 @@ class MainWindow(QMainWindow):
             editor = self.editors_tabs.widget(i)
             editor.set_dark_mode(self.cfg_dark.get_value() == 1)
             editor.set_font_size(self.cfg_font_size.get_value() + 10)
+            print("Setting font size")
             editor.append_autocomplete(self.cfg_autocomplete.get("").split(";"), True)
             editor.set_delay(self.cfg_delay.get())
+
+        print("update console widget size", self.console_widget)
         self.console_widget.update_config()
 
     def set_font_size(self, delta):

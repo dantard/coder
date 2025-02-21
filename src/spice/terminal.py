@@ -245,16 +245,28 @@ class Console(SpiceTerminal):
         return self.file_extension.get_item(self.file_extension.get(0))
 
     def set_font_size(self, size):
-        self.terminal.font_size = int(size * 0.75)
-        font = QFont("Monospace")
-        font.setStyleHint(QFont.Monospace)
-        font.setPointSize(size)
-        print("font size", size)
-        self.terminal.set_font(font)
-        self.terminal.input("clear\r\n".encode("utf-8"))
+        try:
+            self.terminal.font_size = int(size * 0.75)
+            font = QFont("Monospace")
+            font.setStyleHint(QFont.Monospace)
+            font.setPointSize(size)
+            print("font size", size)
+            self.terminal.set_font(font)
+            self.terminal.input("clear\r\n".encode("utf-8"))
+        except:
+            pass
+
+    def update_config(self):
+        font_size = self.config.root().get_child("font_size").get_value()
+        print("mmmmmmmmmmmmmmmmmmmmmmmmmmmm", font_size)
+        if font_size is not None:
+            print("mmmmmmmmmmmmmmmmmm222mmmmmmmmmm", font_size)
+
+            self.set_font_size(font_size+10)
 
     def resizeEvent(self, a0):
-        self.terminal.set_canvas_size(self.width(), self.height())
+        #TODO: self.terminal.set_canvas_size(self.width(), self.height())
+        pass
 
 # class Console2(SpiceTerminal):
 #     def __init__(self):
