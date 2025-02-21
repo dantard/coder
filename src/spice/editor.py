@@ -368,7 +368,6 @@ class LanguageEditor(QWidget):
         self.set_font_size(font_size)
 
     def set_font_size(self, font_size):
-        print("font size", font_size)
         font = QFont("Monospace")
         font.setStyleHint(QFont.TypeWriter)
         font.setPixelSize(font_size)

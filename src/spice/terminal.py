@@ -157,7 +157,6 @@ class Jupyter(SpiceTerminal):
         pass#self.jupyter_widget.execute("%clear")
 
     def set_font_size(self, font_size):
-        print("calling set_font_size", font_size)
         font = QFont("Monospace")
         font.setStyleHint(QFont.TypeWriter)
         font.setPixelSize(font_size)
@@ -250,18 +249,14 @@ class Console(SpiceTerminal):
             font = QFont("Monospace")
             font.setStyleHint(QFont.Monospace)
             font.setPointSize(size)
-            print("font size", size)
             self.terminal.set_font(font)
-            self.terminal.input("clear\r\n".encode("utf-8"))
+            # self.terminal.input("clear\r\n".encode("utf-8"))
         except:
             pass
 
     def update_config(self):
         font_size = self.config.root().get_child("font_size").get_value()
-        print("mmmmmmmmmmmmmmmmmmmmmmmmmmmm", font_size)
         if font_size is not None:
-            print("mmmmmmmmmmmmmmmmmm222mmmmmmmmmm", font_size)
-
             self.set_font_size(font_size+10)
 
     def resizeEvent(self, a0):

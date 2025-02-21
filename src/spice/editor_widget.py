@@ -118,7 +118,6 @@ class EditorWidget(QWidget):
 
             filename = filename.replace(ext, "") + ext
         if ok:
-            print("saving as", filename)
             with open(filename, "w") as f:
                 f.write(self.language_editor.text_edit.toPlainText())
 
@@ -129,7 +128,6 @@ class EditorWidget(QWidget):
         self.prog_cb.setCurrentIndex(0)
         self.language_editor.clear()
         # self.console_widget.clear()
-        print("clear", self.sender())
 
     def execute_code(self):
         self.language_editor.format_code()
