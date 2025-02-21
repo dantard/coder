@@ -1,60 +1,118 @@
 import random
 import re
-import time
 
 import autopep8
 from PyQt5 import QtGui
 from PyQt5.QtCore import pyqtSignal, Qt, QTimer
-from PyQt5.QtGui import QTextCursor, QTextCharFormat, QColor, QFont, QSyntaxHighlighter, QPainter, QFontMetrics
-from PyQt5.QtWidgets import QTextEdit, QApplication, QWidget, QHBoxLayout, QScrollBar
+from PyQt5.QtGui import QFont, QFontMetrics, QColor, QPainter
+from PyQt5.QtWidgets import QTextEdit, QHBoxLayout, QScrollBar, QApplication
+
+from spice.line_number_text_edit import LineNumberTextEdit
+from spice.magic_scrollbar import MagicScrollBar
 
 
-class HighlightableTextEdit(QTextEdit):
-    def __init__(self):
-        super().__init__()
-        self.line_highlighter_color = QColor(255, 255, 255, 100)
-
-    def highlight_line(self, line_number):
-        cursor = self.textCursor()
-        position = cursor.position()
-        cursor.movePosition(QTextCursor.Start)
-
-        # Select all text and reset formatting
-        cursor.select(QTextCursor.Document)
-        default_format = QTextCharFormat()  # Default format (no highlights)
-        cursor.setCharFormat(default_format)
-
-        cursor.movePosition(QTextCursor.Start)
-        for _ in range(line_number):
-            cursor.movePosition(QTextCursor.Down)
-
-        cursor.select(QTextCursor.LineUnderCursor)
-
-        highlight_format = QTextCharFormat()
-        highlight_format.setBackground(self.line_highlighter_color)
-        cursor.setCharFormat(highlight_format)
-        cursor.setPosition(position)
-
-    def set_line_highlighter_color(self, color):
-        self.line_highlighter_color = color
-        self.update()
-
-class MagicEditor(QTextEdit):
+class SpiceMagicEditor(QTextEdit):
     ctrl_enter = pyqtSignal()
-    info = pyqtSignal(str, int)
-
+    info = pyqtSignal(str, int, int)
 
     def __init__(self, highlighter=None, font_size=18):
         super().__init__()
-        self.suggestion = None
         self.highlighter = highlighter
-        self.highlighter.setDocument(self.document())
+        self.suggestion = None
         self.candidates = []
+        self.count = 0
         self.mode = 0
         self.code = ""
-        self.count = 0
         self.delay = 0.01
         self.autocomplete_words = []
+
+        self.line_number_area = LineNumberTextEdit(self)
+        self.line_number_area.verticalScrollBar().valueChanged.connect(self.verticalScrollBar().setValue)
+        self.line_number_area.document().setDocumentMargin(0)
+
+        self.setContentsMargins(0, 0, 0, 0)
+        self.document().setDocumentMargin(0)
+        self.setViewportMargins(60, 0, 0, 0)
+        self.setLineWrapMode(QTextEdit.NoWrap)
+        self.setPlaceholderText("Write Python code here...")
+
+        self.setHorizontalScrollBar(MagicScrollBar())
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
+
+        self.textChanged.connect(self.text_changed)
+        self.verticalScrollBar().valueChanged.connect(self.line_number_area.verticalScrollBar().setValue)
+        self.horizontalScrollBar().rangeChanged.connect(self.text_changed)
+
+        self.cursorPositionChanged.connect(
+            lambda: self.line_number_area.highlight_line(self.textCursor().blockNumber()))
+
+        if self.highlighter:
+            self.highlighter.setDocument(self.document())
+
+        self.set_font_size(font_size)
+
+    def set_font_size(self, font_size):
+        font = QFont("Monospace")
+        font.setStyleHint(QFont.TypeWriter)
+        font.setPixelSize(font_size)
+        self.setFont(font)
+        self.line_number_area.setFont(font)
+        three_numbers_width = QFontMetrics(font).width("000")
+        self.line_number_area.setFixedWidth(int(three_numbers_width + 12))
+        self.setViewportMargins(three_numbers_width + 15, 0, 0, 0)
+
+    def show_code(self):
+        self.show_all_code()
+
+    def set_dark_mode(self, dark):
+        self.line_number_area.set_dark_mode(dark)
+        self.highlighter.set_dark_mode(dark)
+        self.highlighter.setDocument(self.document())
+
+    def set_text(self, text):
+        self.setPlainText(text)
+        self.text_changed()
+
+    def text_changed(self):
+        text = self.toPlainText()
+        lines = text.split("\n")
+        v1 = self.line_number_area.verticalScrollBar().value()
+        self.line_number_area.blockSignals(True)
+        self.line_number_area.clear()
+        text = str()
+        for i in range(len(lines)):
+            text += "{:3d}\n".format(i + 1)
+
+        self.line_number_area.setPlainText(text)
+        self.line_number_area.setFixedHeight(self.height())
+        self.line_number_area.verticalScrollBar().setMaximum(self.verticalScrollBar().maximum())
+        self.line_number_area.verticalScrollBar().setValue(v1)
+        self.line_number_area.blockSignals(False)
+
+    def resizeEvent(self, a0) -> None:
+        self.text_changed()
+        self.blockSignals(True)
+        super().resizeEvent(a0)
+        self.blockSignals(False)
+
+    def format_code(self):
+        self.format_code()
+
+    def get_text(self):
+        return self.toPlainText()
+
+    def clear(self):
+        self.set_code("")
+        self.setPlainText("")
+        self.count = 0
+        self.set_mode(0)
+
+    def get_code(self):
+        return self.code
+
+    def get_remaining_chars(self):
+        diff = len(self.get_code()) - self.count
+        return diff
 
     def set_delay(self, delay):
         self.delay = delay
@@ -64,13 +122,12 @@ class MagicEditor(QTextEdit):
             self.autocomplete_words.clear()
         self.autocomplete_words += words
 
-    def set_dark_mode(self, dark):
-        self.highlighter.set_dark_mode(dark)
-        self.highlighter.setDocument(self.document())
-
     def set_code(self, code):
+        self.setText("")
+        self.count = 0
         self.code = code
         self.set_mode(1)
+        self.setFocus()
 
     def set_mode(self, mode):
         self.mode = mode
@@ -78,14 +135,11 @@ class MagicEditor(QTextEdit):
         # self.setReadOnly(self.mode == 1)
         self.update()
 
-    def format_code(self):
-        pass
-
     def on_return_key(self, e):
         return False
 
     def complete_line(self, sleep=True):
-        self.info.emit(self.get_next_line(), 0)
+        self.info.emit(self.get_next_line(), self.get_remaining_chars(), 20)
         if self.count < len(self.code):
             # self.setText(self.toPlainText() + self.code[self.count])
             self.insertPlainText(self.code[self.count])
@@ -99,10 +153,8 @@ class MagicEditor(QTextEdit):
                     return True
 
             QApplication.processEvents()
-            #time.sleep(self.delay + random.random() * 10 * self.delay)
             delay = int(self.delay) + random.randint(0, int(self.delay))
             QTimer.singleShot(delay, self.complete_line)
-
 
     def get_rest_of_line(self):
         count = self.count
@@ -131,28 +183,13 @@ class MagicEditor(QTextEdit):
         return current_line
 
     def append_next_char(self):
-        # now = self.toPlainText()
-        # result = re.sub(r"[ñ´çº]", "", self.toPlainText())
-        # if result != now:
-        #     self.setText(result)
-        #     self.moveCursor(QtGui.QTextCursor.End)
-
-        # self.insertPlainText(self.code[self.count])
-        # TODO: once filtered ñ use insertPlainText
         self.count += 1
         self.setText(self.code[:self.count])
         self.moveCursor(QtGui.QTextCursor.End)
 
-
     def show_all_code(self):
-        # is control pressed? check
-        if QApplication.keyboardModifiers() == Qt.ControlModifier:
-            while self.complete_line(False):
-                pass
-            self.set_mode(0)
-        else:
-            self.setText(self.code)
-            self.set_mode(0)
+        self.setText(self.code)
+        self.set_mode(0)
         self.moveCursor(QtGui.QTextCursor.End)
 
     def get_current_line_text(self):
@@ -169,24 +206,18 @@ class MagicEditor(QTextEdit):
         self.setFocusPolicy(Qt.StrongFocus)
 
         if e.key() == Qt.Key_Escape:
-            self.set_mode(0 if self.mode==1 else 0)
+            self.set_mode(0 if self.mode == 1 else 0)
 
         if self.mode == 1:
+            print("mode1")
             if e.key() == Qt.Key_Down:
                 self.show_all_code()
-            elif e.text() == "º":
-                self.complete_line(True)
             elif e.key() == Qt.Key_Control:
                 return
             elif e.key() == Qt.Key_End:
                 while self.complete_line(False):
                     pass
                 self.set_mode(0)
-
-            # elif e.key() == Qt.Key_Return:
-            # super().keyPressEvent(e)
-            # self.set_mode(0)
-            #    pass
             elif e.key() == Qt.Key_Tab:
                 if e.modifiers() == Qt.ControlModifier:
                     while self.complete_line():
@@ -195,7 +226,7 @@ class MagicEditor(QTextEdit):
                 else:
                     self.complete_line()
             elif self.count < len(self.code):
-                self.info.emit(self.get_rest_of_line(), 1000)
+                self.info.emit(self.get_rest_of_line(), self.get_remaining_chars(), 1000)
                 self.append_next_char()
             elif e.key() == Qt.Key_Return:
                 self.set_mode(0)
@@ -210,8 +241,6 @@ class MagicEditor(QTextEdit):
 
             if e.key() == Qt.Key_Tab:
                 self.tab_pressed()
-                # self.setText(self.toPlainText() + "    ")
-                # self.moveCursor(QtGui.QTextCursor.End)
             elif e.key() == Qt.Key_Backspace:
                 self.suggestion = None
                 if self.get_current_line_text().endswith("    "):
@@ -237,7 +266,7 @@ class MagicEditor(QTextEdit):
         current_line = self.get_current_line_text()
         current_words = re.split(r'\W+', self.toPlainText())
 
-        # it was jusr a tab
+        # it was just a tab
         if len(current_line) == 0 or current_line.endswith("    "):
             self.insertPlainText("    ")
             self.moveCursor(QtGui.QTextCursor.End)
@@ -261,6 +290,7 @@ class MagicEditor(QTextEdit):
 
             self.candidates = [word for word in word_set if word.startswith(unfinished_word)]
             if len(self.candidates) == 0:
+                self.insertPlainText("    ")
                 return
             elif len(self.candidates) == 1:
                 self.insertPlainText(self.candidates[0][len(unfinished_word):])
@@ -275,7 +305,6 @@ class MagicEditor(QTextEdit):
         self.suggestion = self.candidates.pop(0)
         self.insertPlainText(self.suggestion)
 
-
     def get_next_line(self):
         count = self.count
         remaining = self.code[count:]
@@ -285,10 +314,12 @@ class MagicEditor(QTextEdit):
         if remaining:
             return remaining[0]
 
-class PascalEditor(MagicEditor):
+
+class PascalEditor(SpiceMagicEditor):
     pass
 
-class PythonEditor(MagicEditor):
+
+class PythonEditor(SpiceMagicEditor):
     def format_code(self):
         code = self.toPlainText()
         if not code.endswith("\n"):
@@ -312,121 +343,3 @@ class PythonEditor(MagicEditor):
                 self.insertPlainText("\n" + " " * (max(spaces - 4, 0)))
             return True
         return False
-
-class KK(QScrollBar):
-    def paintEvent(self, a0) -> None:
-        super().paintEvent(a0)
-        if self.maximum() == 0:
-            p = QPainter(self)
-            p.fillRect(self.rect(), self.parent().palette().base().color())
-
-
-class LanguageEditor(QWidget):
-    ctrl_enter = pyqtSignal()
-    info = pyqtSignal(str, int)
-
-    def __init__(self, editor, font_size=18):
-        super().__init__()
-        self.text_edit = editor
-        self.line_number_area = HighlightableTextEdit()
-        self.setLayout(QHBoxLayout())
-        self.layout().addWidget(self.line_number_area)
-        self.layout().addWidget(self.text_edit)
-        self.layout().setSpacing(0)
-        self.line_number_area.setReadOnly(True)
-        self.text_edit.setLineWrapMode(QTextEdit.NoWrap)
-        self.line_number_area.setLineWrapMode(QTextEdit.NoWrap)
-
-        self.text_edit: QTextEdit
-        self.text_edit.setHorizontalScrollBar(KK())
-        self.line_number_area.setHorizontalScrollBar(KK())
-
-        self.text_edit.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
-        self.line_number_area.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-        self.line_number_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
-
-        self.text_edit.textChanged.connect(self.text_changed)
-        self.text_edit.verticalScrollBar().valueChanged.connect(self.line_number_area.verticalScrollBar().setValue)
-        self.text_edit.horizontalScrollBar().rangeChanged.connect(self.text_changed)
-        self.line_number_area.verticalScrollBar().valueChanged.connect(self.text_edit.verticalScrollBar().setValue)
-
-        self.text_edit.ctrl_enter.connect(self.ctrl_enter.emit)
-        self.text_edit.info.connect(self.info.emit)
-        # self.text_edit.info.connect(self.update_status_bar)
-        self.text_edit.setPlaceholderText("Write Python code here...")
-        #self.text_edit.setStyleSheet("QTextEdit {QTextEdit::placeholder { font-size: 16px; }")
-
-        # self.line_number_area.setStyleSheet("QTextEdit { color: #a0a0a0;}")
-        self.line_number_area.setContentsMargins(0, 0, 0, 0)
-        self.text_edit.setContentsMargins(0, 0, 0, 0)
-        self.text_edit.document().setDocumentMargin(5)
-        self.line_number_area.document().setDocumentMargin(5)
-
-        self.text_edit.cursorPositionChanged.connect(
-            lambda: self.line_number_area.highlight_line(self.text_edit.textCursor().blockNumber()))
-
-        self.set_font_size(font_size)
-
-    def set_font_size(self, font_size):
-        font = QFont("Monospace")
-        font.setStyleHint(QFont.TypeWriter)
-        font.setPixelSize(font_size)
-        self.text_edit.setFont(font)
-        self.line_number_area.setFont(font)
-        three_numbers_width = QFontMetrics(font).width("000")
-        self.line_number_area.setMaximumWidth(int(three_numbers_width+12))
-
-    def show_code(self):
-        self.text_edit.show_all_code()
-    def set_dark_mode(self, dark):
-        self.text_edit.set_dark_mode(dark)
-        self.line_number_area.set_line_highlighter_color(QColor(0,0,0,50) if not dark else QColor(255,255,255,100))
-
-    def set_text(self, text):
-        self.text_edit.setPlainText(text)
-        self.text_changed()
-
-    def text_changed(self):
-        text = self.text_edit.toPlainText()
-        lines = text.split("\n")
-        cursor_pos = self.text_edit.textCursor().position()
-        v1 = self.line_number_area.verticalScrollBar().value()
-        self.line_number_area.blockSignals(True)
-        self.line_number_area.clear()
-        text = ""
-
-        for i in range(len(lines)):  # TODO: was +`11 (maybe for when the editor is full)
-            # self.line_number_area.append("{:3d}".format(i + 1))
-            text += "{:3d}\n".format(i + 1)
-        self.line_number_area.setPlainText(text)
-
-        self.line_number_area.verticalScrollBar().setValue(v1)
-        self.line_number_area.blockSignals(False)
-
-    def format_code(self):
-        self.text_edit.format_code()
-
-    def get_text(self):
-        return self.text_edit.toPlainText()
-
-    def set_code(self, code):
-        self.text_edit.set_code(code)
-        self.text_edit.count = 0
-        self.text_edit.clear()
-        self.text_edit.setFocus()
-
-    def clear(self):
-        self.text_edit.set_code("")
-        self.text_edit.setPlainText("")
-        self.text_edit.count = 0
-        self.text_edit.set_mode(0)
-
-    def set_mode(self, mode):
-        self.text_edit.set_mode(mode)
-
-    def get_code(self):
-        return self.text_edit.code
-
-    def get_remaining_chars(self):
-        diff = len(self.get_code()) - self.text_edit.count
-        return diff
