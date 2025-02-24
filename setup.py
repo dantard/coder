@@ -12,6 +12,7 @@ setup(
         'scipy',
         'qtconsole',
         'termqt',
+        'easyconfig2@git+https://github.com/dantard/easyconfig2.git'
     ],
     author='Danilo Tardioli',
     author_email='dantard@unizar.es',

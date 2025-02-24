@@ -63,7 +63,7 @@ class EditorWidget(QWidget):
         a1 = bar.addAction("Play", self.execute_code)
 
         a2 = bar.addAction("Clear", self.clear)
-        a3 = bar.addAction("Show")
+        a3 = bar.addAction("Show", self.language_editor.show_code)
 
         self.keep_banner = bar.addAction("#")
         self.keep_banner.setCheckable(True)
