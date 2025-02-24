@@ -14,10 +14,10 @@ from termqt import Terminal
 class SpiceConsole(QWidget):
     done = pyqtSignal()
 
-    def __init__(self):
+    def __init__(self, config):
         super().__init__()
         self.keep_code = False
-        self.config = None
+        self.config = config
 
     def execute(self, code, clear=True):
         pass
@@ -43,14 +43,14 @@ class SpiceConsole(QWidget):
     def get_file_extension(self):
         return ".py"
 
-    def update_config(self):
+    def update_config(self, **kwargs):
         pass
 
 
 class JupyterConsole(SpiceConsole):
 
-    def __init__(self, font_size=18):
-        super().__init__()
+    def __init__(self, config):
+        super().__init__(config)
 
         kernel_manager = QtKernelManager(kernel_name='python3')
         kernel_manager.start_kernel()
@@ -60,7 +60,7 @@ class JupyterConsole(SpiceConsole):
         self.jupyter_widget = RichJupyterWidget()
         font = QFont("Monospace")
         font.setStyleHint(QFont.TypeWriter)
-        font.setPixelSize(font_size)
+        font.setPixelSize(18)
         self.jupyter_widget.font = font
 
         # self.jupyter_widget._set_font()
@@ -86,14 +86,16 @@ class JupyterConsole(SpiceConsole):
     def config_read(self):
         pass
 
-    def update_config(self):
-        path = self.config.root().get_child("progs_path").get_value()
+    def update_config(self, **kwargs):
+        path = self.config.progs_path.get()
         if path:
             self.jupyter_widget.execute("cd " + path, hidden=True)
 
-        font_size = self.config.root().get_child("font_size").get_value()
-        if font_size:
-            self.set_font_size(font_size + 10)
+        size = self.config.font_size.get()
+        print("setting font size to ", size)
+
+        if size>=0:
+            self.set_font_size(size + 10)
 
     def set_dark_mode(self, value):
         if value:
@@ -163,8 +165,8 @@ import platform
 
 
 class TermQtConsole(SpiceConsole):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, config):
+        super().__init__(config)
         self.terminal = Terminal(400, 600, font_size=18)
         layout = QVBoxLayout()
         layout.addWidget(self.terminal)

@@ -3,7 +3,7 @@ import sys
 
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtWidgets import QApplication, QMainWindow, QSplitter, QPushButton, QVBoxLayout, QWidget, \
-    QTabWidget, QFileDialog, QShortcut, QTabBar
+    QTabWidget, QFileDialog, QShortcut, QTabBar, QMessageBox
 from easyconfig2.easyconfig import EasyConfig2 as EasyConfig
 
 import spice.resources  # noqa
@@ -25,75 +25,9 @@ class CustomTabBar(QTabBar):
 
 class MainWindow(QMainWindow):
 
-    def edit_config(self):
-        if self.config.edit(min_width=400, min_height=400):
-            self.config.save("spice.yaml")
-            self.apply_config()
-
-    def apply_config(self):
-
-        if self.slides_tabs.currentIndex() != 0:
-            self.update_toolbar_position()
-            for i in range(1, self.slides_tabs.count()):
-                self.slides_tabs.widget(i).set_toolbar_float(self.cfg_tb_float.get_value() == 1, self.slides_tabs)
-
-        for i in range(self.editors_tabs.count()):
-            editor = self.editors_tabs.widget(i)
-            editor.set_dark_mode(self.cfg_dark.get_value() == 1)
-            editor.set_font_size(self.cfg_font_size.get_value() + 10)
-            editor.append_autocomplete(self.cfg_autocomplete.get("").split(";"), True)
-            editor.set_delay(self.cfg_delay.get())
-
-        self.console_widget.update_config()
-
-    def set_font_size(self, delta):
-
-        current_font_size = self.editors_tabs.currentWidget().get_font_size()
-        goal = current_font_size + delta
-        if goal < 10 or goal > 32:
-            return
-        for i in range(self.editors_tabs.count()):
-            self.editors_tabs.widget(i).set_font_size(goal)
-        self.console_widget.set_font_size(goal)
-        self.cfg_font_size.set_value(goal - 10)
-
-    def change_font_size(self, x):
-        for i in range(1, self.editors_tabs.count()):
-            self.editors_tabs.widget(i).set_font_size(x)
-        self.console_widget.set_font_size(x)
-
-    def get_editor(self):
-        if len(sys.argv) == 2:
-            editor = PascalEditor()
-        else:
-            editor = PythonEditor(PythonHighlighter())
-        return editor
-
-    def remove_editor_tab(self, index):
-        if index > 0:
-            self.editors_tabs.removeTab(index)
-        else:
-            self.editors_tabs.widget(0).clear()
-
-    def new_editor_tab(self, console):
-        editor = EditorWidget(self.get_editor(), console, self.config)
-
-        self.editors_tabs.addTab(editor, "Code")
-        editor.set_dark_mode(self.cfg_dark.get_value() == 1)
-        self.editors_tabs.setCurrentWidget(editor)
-        self.apply_config()
-
-    def editor_tab_changed(self, index):
-        pass
-
     def __init__(self):
         super().__init__()
         self.config = EasyConfig(immediate=True)
-
-        if len(sys.argv) == 2:
-            self.console_widget = TermQtConsole()
-        else:
-            self.console_widget = JupyterConsole()
 
         general = self.config.root()
         self.cfg_dark = general.addCombobox("dark", pretty="Mode", items=["Light", "Dark"], default=0)
@@ -109,36 +43,14 @@ class MainWindow(QMainWindow):
                                                 default=0)
         hidden = self.config.root().addHidden("parameters")
         self.cfg_last = hidden.addList("last", default=[])
-        self.cfg_show_sb = general.addCheckbox("show_tb",
-                                               pretty="Show Toolbar",
-                                               default=False)
-        general.addCheckbox("keep_code",
-                            pretty="Keep Code on Run",
-                            default=False)
-        general.addCheckbox("show_all",
-                            pretty="Show all Code on Open",
-                            default=False)
+
 
         self.cfg_slides_path = general.addFolderChoice("slides_path",
                                                        pretty="Slides Path",
                                                        default=str(os.getcwd()) + os.sep + "slides" + os.sep)
-        self.cfg_progs_path = general.addFolderChoice("progs_path",
-                                                      pretty="Programs Path",
-                                                      default=str(os.getcwd()) + os.sep + "progs" + os.sep)
-        self.cfg_autocomplete = general.addString("autocomplete",
-                                                  pretty="Autocomplete",
-                                                  default="")
-        self.cfg_delay = general.addSlider("delay",
-                                           pretty="Delay",
-                                           min=0, max=100,
-                                           default=25,
-                                           den=1,
-                                           show_value=True,
-                                           suffix=" ms")
 
-        self.console_widget.set_config(self.config)
-        self.config.load("spice.yaml")
-        self.console_widget.config_read()
+
+
         self.dark = False
 
         # SPICE – Slides, Python, Interactive Creation, and Education
@@ -151,8 +63,13 @@ class MainWindow(QMainWindow):
         self.slides_tabs.currentChanged.connect(self.tab_changed)
         self.slides_tabs.tabBar().setTabButton(0, QTabBar.ButtonPosition.RightSide, None)
 
+        self.console_widget = JupyterConsole(self.config)
+        self.base_editor = EditorWidget(self.get_editor(), self.console_widget, self.config)
+
+        self.config.load("spice.yaml")
+
         self.editors_tabs = QTabWidget()
-        self.editors_tabs.addTab(EditorWidget(self.get_editor(), self.console_widget, self.config), "Code")
+        self.editors_tabs.addTab(self.base_editor, "Code")
         self.editors_tabs.setTabsClosable(True)
         self.editors_tabs.tabCloseRequested.connect(self.remove_editor_tab)
         self.editors_tabs.currentChanged.connect(self.editor_tab_changed)
@@ -200,10 +117,10 @@ class MainWindow(QMainWindow):
         q.activated.connect(self.toggle_color_scheme)
 
         q = QShortcut("Ctrl++", self)
-        q.activated.connect(lambda: self.set_font_size(1))
+        q.activated.connect(lambda: self.modify_font_size(1))
 
         q = QShortcut("Ctrl+-", self)
-        q.activated.connect(lambda: self.set_font_size(-1))
+        q.activated.connect(lambda: self.modify_font_size(-1))
 
         q = QShortcut("Ctrl+E", self)
         q.activated.connect(lambda: self.new_editor_tab(self.console_widget))
@@ -220,12 +137,78 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Spice")
         self.setCentralWidget(helper)
 
-        QTimer.singleShot(10, self.finish_config)
-
         # Connect config after creation of widgets
         self.console_widget.done.connect(self.editors_tabs.currentWidget().language_editor.setFocus)
-        self.cfg_font_size.value_changed.connect(lambda x: self.change_font_size(int(x.get() + 10)))
+        self.cfg_font_size.value_changed.connect(lambda x: self.set_font_size(int(x.get() + 10)))
         self.cfg_dark.value_changed.connect(lambda x: self.apply_color_scheme(x.get()))
+
+        QTimer.singleShot(10, self.finish_config)
+
+
+    def edit_config(self):
+        if self.config.edit(min_width=400, min_height=400):
+            self.config.save("spice.yaml")
+            self.apply_config()
+
+    def apply_config(self):
+
+        if self.slides_tabs.currentIndex() != 0:
+            self.update_toolbar_position()
+            for i in range(1, self.slides_tabs.count()):
+                self.slides_tabs.widget(i).set_toolbar_float(self.cfg_tb_float.get_value() == 1, self.slides_tabs)
+
+        print("WTFF")
+
+        for i in range(self.editors_tabs.count()):
+            print("WTFF", i)
+
+            editor = self.editors_tabs.widget(i)
+            editor.update_config()
+
+        self.console_widget.update_config()
+
+
+
+    def modify_font_size(self, delta):
+
+        current_font_size = self.editors_tabs.currentWidget().get_font_size()
+        goal = current_font_size + delta
+        if goal < 10 or goal > 32:
+            return
+        for i in range(self.editors_tabs.count()):
+            self.editors_tabs.widget(i).set_font_size(goal)
+        self.console_widget.set_font_size(goal)
+        self.cfg_font_size.set_value(goal - 10)
+
+    def set_font_size(self, x):
+        print("WTF")
+        for i in range(0, self.editors_tabs.count()):
+            self.editors_tabs.widget(i).set_font_size(x)
+        self.console_widget.set_font_size(x)
+
+    def get_editor(self):
+        if len(sys.argv) == 2:
+            editor = PascalEditor()
+        else:
+            editor = PythonEditor(PythonHighlighter())
+        return editor
+
+    def remove_editor_tab(self, index):
+        if index > 0:
+            self.editors_tabs.removeTab(index)
+        else:
+            self.editors_tabs.widget(0).clear()
+
+    def new_editor_tab(self, console):
+        editor = EditorWidget(self.get_editor(), console, self.config)
+
+        self.editors_tabs.addTab(editor, "Code")
+        editor.set_dark_mode(self.cfg_dark.get_value() == 1)
+        self.editors_tabs.setCurrentWidget(editor)
+        self.apply_config()
+
+    def editor_tab_changed(self, index):
+        pass
 
 
     def finish_config(self):

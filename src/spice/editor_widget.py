@@ -3,48 +3,76 @@ import os
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont, QIcon
 from PyQt5.QtWidgets import QVBoxLayout, QToolBar, QStatusBar, QWidget, QComboBox, QShortcut, QTabWidget, QFileDialog, \
-    QApplication
+    QApplication, QDialog, QMessageBox
 from spice import utils
 
 import spice.resources  # noqa
 
 
 class DynamicComboBox(QComboBox):
-    def __init__(self, folder, parent=None):
+    def __init__(self, folder=None, parent=None):
         super().__init__(parent)
         self.folder = folder
         self.populate()
 
     def set_folder(self, folder):
         self.folder = folder
+        self.populate()
 
-    def populate(self, item=False):
+
+    def populate(self, item=None):
         self.blockSignals(True)
         self.clear()  # Clear the current items
         self.addItem("[Free Coding]")
-        if os.path.exists(self.folder):
-            files = list(os.listdir(self.folder))
+        if self.folder is not None and os.path.exists(self.folder):
+            files = list(x for x in os.listdir(self.folder) if x.endswith(".py"))
+
             files = [f for f in files if os.path.isfile(os.path.join(self.folder, f))]
             files.sort()
             self.addItems(files)
-            if item:
-                self.setCurrentIndex(self.findText(item))
-        self.blockSignals(False)
+            if item is not None:
+                index = self.findText(item)
+                if index >=0:
+                    self.setCurrentIndex(index)
+            self.blockSignals(False)
+
 
 
 class EditorWidget(QWidget):
 
     def __init__(self, language_editor, console, config):
         super().__init__()
-        self.cfg_progs_path = config.root().get_child("progs_path")
-        self.cfg_show_sb = config.root().get_child("show_tb")
-        self.cfg_show_all = config.root().get_child("show_all")
-        self.cfg_keep_code = config.root().get_child("keep_code")
+        self.config = config
+        editor = config.root().addSubSection("editor", pretty="Editor")
+        self.cfg_keep_code = editor.addCheckbox("keep_code",
+                            pretty="Keep Code on Run",
+                            default=False)
+        self.cfg_show_all = editor.addCheckbox("show_all",
+                            pretty="Show all Code on Open",
+                            default=False)
+        self.cfg_progs_path = editor.addFolderChoice("progs_path",
+                                                      pretty="Programs Path",
+                                                      default=str(os.getcwd()) + os.sep + "progs" + os.sep)
+        self.cfg_autocomplete = editor.addString("autocomplete",
+                                                  pretty="Autocomplete",
+                                                  default="")
+        self.cfg_delay = editor.addSlider("delay",
+                                           pretty="Delay",
+                                           min=0, max=100,
+                                           default=25,
+                                           den=1,
+                                           show_value=True,
+                                           suffix=" ms")
+
+        self.cfg_show_sb = editor.addCheckbox("show_tb",
+                                               pretty="Show Toolbar",
+                                               default=False)
+
 
         self.language_editor = language_editor
         self.console = console
 
-        self.prog_cb = DynamicComboBox(self.cfg_progs_path.get_value())
+        self.prog_cb = DynamicComboBox()
         self.prog_cb.currentIndexChanged.connect(self.load_program)
         font = QFont("Monospace")
         font.setStyleHint(QFont.TypeWriter)
@@ -88,16 +116,25 @@ class EditorWidget(QWidget):
         left_layout.addWidget(self.language_editor)
 
         self.sb = QStatusBar()
-        #if self.cfg_show_sb.get_value():
         left_layout.addWidget(self.sb)
-
-        # left_layout.addWidget(self.run_button)
         left_layout.setSpacing(0)
-        # left_layout.setContentsMargins(0, 0, 0, 0)
+
+        self.setLayout(left_layout)
         self.setLayout(left_layout)
 
-        self.keep_banner.setChecked(self.cfg_keep_code.get_value())
-        self.show_all.setChecked(self.cfg_show_all.get_value())
+    def update_config(self):
+        print("updating config", self.cfg_progs_path.get_value())
+        if not os.path.exists(self.cfg_progs_path.get_value()):
+            QMessageBox.critical(self, "Warning", "The path " + self.cfg_progs_path.get_value() + " does not exist, using default")
+            self.cfg_progs_path.set_value(str(os.getcwd()))
+            print("risssss")
+
+        self.prog_cb.set_folder(self.cfg_progs_path.get_value())
+        self.keep_banner.setChecked(self.cfg_keep_code.get())
+        self.show_all.setChecked(self.cfg_show_all.get())
+        self.language_editor.append_autocomplete(self.cfg_autocomplete.get())
+        self.language_editor.set_delay(self.cfg_delay.get())
+        self.language_editor.set_font_size(self.config.font_size.get() + 10)
 
     def set_font_size(self, font_size):
         self.language_editor.set_font_size(font_size)
@@ -113,11 +150,8 @@ class EditorWidget(QWidget):
             return
 
         file_name = self.prog_cb.currentText()
-        folder = self.cfg_progs_path.get_value()
 
-
-        with open(folder + os.sep + file_name) as f:
-            #    self.text_edit.setPlainText(f.read())
+        with open(self.cfg_progs_path.get() + os.sep + file_name) as f:
             self.language_editor.set_code(f.read())
             self.console.clear()
 
@@ -182,6 +216,12 @@ class EditorWidget(QWidget):
     def show_all_code(self):
         if QApplication.keyboardModifiers() or self.show_all.isChecked():
             self.language_editor.show_all_code()
+
+    def set_progs_path(self, path):
+        value = self.prog_cb.currentText()
+        self.prog_cb.set_folder(path)
+        self.populate_progs()
+        self.prog_cb.setCurrentIndex(self.prog_cb.findText(value))
 
     def update_status_bar(self, x, diff, timeout):
         if self.cfg_show_sb.get_value():

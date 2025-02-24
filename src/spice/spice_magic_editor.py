@@ -120,7 +120,7 @@ class SpiceMagicEditor(QTextEdit):
     def append_autocomplete(self, words, clear=False):
         if clear:
             self.autocomplete_words.clear()
-        self.autocomplete_words += words
+        self.autocomplete_words += words if words else ""
 
     def set_code(self, code):
         self.setText("")
