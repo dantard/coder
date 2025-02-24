@@ -9,6 +9,7 @@ class SyntaxHighlighter(QSyntaxHighlighter):
         self.highlighting_rules = []
         self.keywords = keywords
         self.keyword_color = Qt.blue
+        self.apply_scheme()
 
     def set_dark_mode(self, dark):
         self.keyword_color = Qt.cyan if dark else Qt.blue

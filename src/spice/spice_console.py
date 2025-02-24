@@ -11,7 +11,7 @@ from termqt import Terminal
 
 # from qtpyTerminal import qtpyTerminal
 
-class SpiceTerminal(QWidget):
+class SpiceConsole(QWidget):
     done = pyqtSignal()
 
     def __init__(self):
@@ -47,7 +47,7 @@ class SpiceTerminal(QWidget):
         pass
 
 
-class Jupyter(SpiceTerminal):
+class JupyterConsole(SpiceConsole):
 
     def __init__(self, font_size=18):
         super().__init__()
@@ -93,8 +93,7 @@ class Jupyter(SpiceTerminal):
 
         font_size = self.config.root().get_child("font_size").get_value()
         if font_size:
-            self.set_font_size(font_size+10)
-
+            self.set_font_size(font_size + 10)
 
     def set_dark_mode(self, value):
         if value:
@@ -104,34 +103,31 @@ class Jupyter(SpiceTerminal):
 
     def execute(self, code, clear=True):
 
+
         # self.jupyter_widget._control.setText("")
-        def filtering():
-            if self.keep_code:
-                return
-            text = self.editor.toPlainText()
-            if text.endswith("   ...: "):
-                if clear:
-                    self.editor.clear()
-
-            # pattern = r"In \[\d+\]:"
-            # if re.search(pattern, text[-10:]):
-            #     self.timer.stop()
-            #     self.timer.start(250)
-
-        self.editor.textChanged.connect(filtering)
-        # self.jupyter_widget._control.setFocus()
-        if "input" in code:
-            self.jupyter_widget._control.setFocus()
-        QApplication.processEvents()
+        # def filtering():
+        #     text = self.editor.toPlainText()
+        #     if text.endswith("   ...: "):
+        #         if clear:
+        #             self.editor.clear()
+        #
+        #     # pattern = r"In \[\d+\]:"
+        #     # if re.search(pattern, text[-10:]):
+        #     #     self.timer.stop()
+        #     #     self.timer.start(250)
+        #
+        # self.editor.textChanged.connect(filtering)
+        # # self.jupyter_widget._control.setFocus()
+        # if "input" in code:
+        #     self.jupyter_widget._control.setFocus()
+        # QApplication.processEvents()
 
         def run():
-
-
             if code.strip():
                 code_reset = code
                 self.jupyter_widget.execute(code_reset, interactive=True)
-                # if not self.keep_banner.isChecked():
-                #    self.jupyter_widget._control.clear()
+                if clear:
+                    self.jupyter_widget._control.clear()
 
         clearer = '''
         import sys
@@ -154,7 +150,7 @@ class Jupyter(SpiceTerminal):
         QTimer.singleShot(100, run)
 
     def clear(self):
-        pass#self.jupyter_widget.execute("%clear")
+        pass  # self.jupyter_widget.execute("%clear")
 
     def set_font_size(self, font_size):
         font = QFont("Monospace")
@@ -166,7 +162,7 @@ class Jupyter(SpiceTerminal):
 import platform
 
 
-class Console(SpiceTerminal):
+class TermQtConsole(SpiceConsole):
     def __init__(self):
         super().__init__()
         self.terminal = Terminal(400, 600, font_size=18)
@@ -257,10 +253,10 @@ class Console(SpiceTerminal):
     def update_config(self):
         font_size = self.config.root().get_child("font_size").get_value()
         if font_size is not None:
-            self.set_font_size(font_size+10)
+            self.set_font_size(font_size + 10)
 
     def resizeEvent(self, a0):
-        #TODO: self.terminal.set_canvas_size(self.width(), self.height())
+        # TODO: self.terminal.set_canvas_size(self.width(), self.height())
         pass
 
 # class Console2(SpiceTerminal):

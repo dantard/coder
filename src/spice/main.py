@@ -8,10 +8,10 @@ from easyconfig2.easyconfig import EasyConfig2 as EasyConfig
 
 import spice.resources  # noqa
 from spice.dialogs import Author
-from spice.editor import PythonEditor, LanguageEditor, PascalEditor
 from spice.editor_widget import EditorWidget
 from spice.highlighter import PythonHighlighter, PascalHighlighter
-from spice.terminal import Jupyter, Console
+from spice.spice_magic_editor import PythonEditor, PascalEditor
+from spice.spice_console import JupyterConsole, TermQtConsole
 from spice.textract import Slides
 
 
@@ -31,10 +31,12 @@ class MainWindow(QMainWindow):
             self.apply_config()
 
     def apply_config(self):
-        for i in range(1, self.tabs.count()):
-            self.tabs.widget(i).set_toolbar_float(self.cfg_tb_float.get_value() == 1, self.tabs)
-        self.update_toolbar_position()
-        #
+
+        if self.slides_tabs.currentIndex() != 0:
+            self.update_toolbar_position()
+            for i in range(1, self.slides_tabs.count()):
+                self.slides_tabs.widget(i).set_toolbar_float(self.cfg_tb_float.get_value() == 1, self.slides_tabs)
+
         for i in range(self.editors_tabs.count()):
             editor = self.editors_tabs.widget(i)
             editor.set_dark_mode(self.cfg_dark.get_value() == 1)
@@ -62,9 +64,9 @@ class MainWindow(QMainWindow):
 
     def get_editor(self):
         if len(sys.argv) == 2:
-            editor = LanguageEditor(PascalEditor(PascalHighlighter()))
+            editor = PascalEditor()
         else:
-            editor = LanguageEditor(PythonEditor(PythonHighlighter()))
+            editor = PythonEditor(PythonHighlighter())
         return editor
 
     def remove_editor_tab(self, index):
@@ -75,6 +77,7 @@ class MainWindow(QMainWindow):
 
     def new_editor_tab(self, console):
         editor = EditorWidget(self.get_editor(), console, self.config)
+
         self.editors_tabs.addTab(editor, "Code")
         editor.set_dark_mode(self.cfg_dark.get_value() == 1)
         self.editors_tabs.setCurrentWidget(editor)
@@ -88,13 +91,17 @@ class MainWindow(QMainWindow):
         self.config = EasyConfig(immediate=True)
 
         if len(sys.argv) == 2:
-            self.console_widget = Console()
+            self.console_widget = TermQtConsole()
         else:
-            self.console_widget = Jupyter()
+            self.console_widget = JupyterConsole()
 
         general = self.config.root()
         self.cfg_dark = general.addCombobox("dark", pretty="Mode", items=["Light", "Dark"], default=0)
         self.cfg_dark.value_changed.connect(lambda x: self.apply_color_scheme(x.get()))
+
+        self.cfg_open_fullscreen = general.addCheckbox("open_fullscreen",
+                                                       pretty="Open Fullscreen",
+                                                       default=False)
 
         self.cfg_font_size = general.addCombobox("font_size", pretty="Font size", items=[str(i) for i in range(10, 33)],
                                                  default=0)
@@ -108,9 +115,13 @@ class MainWindow(QMainWindow):
         self.cfg_show_sb = general.addCheckbox("show_tb",
                                                pretty="Show Toolbar",
                                                default=False)
-        self.cfg_open_fullscreen = general.addCheckbox("open_fullscreen",
-                                                       pretty="Open Fullscreen",
-                                                       default=False)
+        general.addCheckbox("keep_code",
+                            pretty="Keep Code on Run",
+                            default=False)
+        general.addCheckbox("show_all",
+                            pretty="Show all Code on Open",
+                            default=False)
+
         self.cfg_slides_path = general.addFolderChoice("slides_path",
                                                        pretty="Slides Path",
                                                        default=str(os.getcwd()) + os.sep + "slides" + os.sep)
@@ -136,12 +147,12 @@ class MainWindow(QMainWindow):
         # SPICE – Slides, Python, Interactive Creation, and Education
         # slides and python for interactive and creative education
 
-        self.tabs = QTabWidget()
-        self.tabs.setTabPosition(QTabWidget.South)
-        self.tabs.setTabsClosable(True)
-        self.tabs.tabCloseRequested.connect(self.close_tab_requested)
-        self.tabs.currentChanged.connect(self.tab_changed)
-        self.tabs.tabBar().setTabButton(0, QTabBar.ButtonPosition.RightSide, None)
+        self.slides_tabs = QTabWidget()
+        self.slides_tabs.setTabPosition(QTabWidget.South)
+        self.slides_tabs.setTabsClosable(True)
+        self.slides_tabs.tabCloseRequested.connect(self.close_tab_requested)
+        self.slides_tabs.currentChanged.connect(self.tab_changed)
+        self.slides_tabs.tabBar().setTabButton(0, QTabBar.ButtonPosition.RightSide, None)
 
         self.editors_tabs = QTabWidget()
         self.editors_tabs.addTab(EditorWidget(self.get_editor(), self.console_widget, self.config), "Code")
@@ -156,14 +167,14 @@ class MainWindow(QMainWindow):
         self.splitter = QSplitter(Qt.Horizontal)
         self.splitter.addWidget(helper)
         self.splitter.addWidget(self.console_widget)
-        self.tabs.addTab(self.splitter, "Code Execution")
+        self.slides_tabs.addTab(self.splitter, "Code Execution")
 
         helper = QWidget()
         helper.setContentsMargins(0, 0, 0, 0)
         helper.setLayout(QVBoxLayout())
         helper.layout().setContentsMargins(0, 0, 0, 0)
         helper.layout().setSpacing(0)
-        helper.layout().addWidget(self.tabs)
+        helper.layout().addWidget(self.slides_tabs)
 
         menu = self.menuBar()
         file = menu.addMenu("File")
@@ -197,7 +208,7 @@ class MainWindow(QMainWindow):
         q = QShortcut("Ctrl+-", self)
         q.activated.connect(lambda: self.set_font_size(-1))
 
-        q = QShortcut("Ctrl+N", self)
+        q = QShortcut("Ctrl+E", self)
         q.activated.connect(lambda: self.new_editor_tab(self.console_widget))
 
         q = QShortcut("Ctrl+L", self)
@@ -213,10 +224,9 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(helper)
 
         QTimer.singleShot(10, self.finish_config)
-        self.console_widget.done.connect(self.editors_tabs.currentWidget().language_editor.text_edit.setFocus)
+        self.console_widget.done.connect(self.editors_tabs.currentWidget().language_editor.setFocus)
 
     def finish_config(self):
-        self.update_toolbar_position()
         self.splitter.setSizes([int(self.width() * 0.5), int(self.width() * 0.5)])
         self.apply_config()
 
@@ -230,7 +240,7 @@ class MainWindow(QMainWindow):
         for editor in range(self.editors_tabs.count()):
             self.editors_tabs.widget(editor).set_dark_mode(dark)
 
-        if self.tabs.currentIndex() == 0:
+        if self.slides_tabs.currentIndex() == 0:
             self.setStyleSheet("background-color: #000000; color: white" if dark else "")
 
     def toggle_focus(self):
@@ -245,7 +255,7 @@ class MainWindow(QMainWindow):
             elem.setChecked(i == mode)
             elem.blockSignals(False)
 
-        self.tabs.currentWidget().set_writing_mode(mode)
+        self.slides_tabs.currentWidget().set_writing_mode(mode)
 
     def keyPressEvent(self, a0):
         if a0.key() == Qt.Key_F11:
@@ -253,45 +263,30 @@ class MainWindow(QMainWindow):
         elif Qt.Key_F1 <= a0.key() <= Qt.Key_F10:
             idx = a0.key() - Qt.Key_F1
 
-            if idx < self.tabs.count():
-                self.tabs.setCurrentIndex(idx)
+            if idx < self.slides_tabs.count():
+                self.slides_tabs.setCurrentIndex(idx)
 
         super().keyPressEvent(a0)
 
     def save_as(self):
         self.editors_tabs.currentWidget().save_program()
 
-    def update_status_bar(self, x, timeout):
-        if self.cfg_show_sb.get_value():
-            x = x.replace("\n", "")
-            diff = self.language_editor.get_remaining_chars()
-            if timeout != 0:
-                x = "{:5d} | {}".format(diff, x)
-                self.sb.showMessage(x, 1000)
-            else:
-                self.sb.showMessage(x)
-
-            # red if diff is negative
-            if diff < 10:
-                self.sb.setStyleSheet("color: red")
-            else:
-                self.sb.setStyleSheet("color: black")
-
     def move_to(self, forward):
-        self.tabs.currentWidget().move_to(forward)
+        self.slides_tabs.currentWidget().move_to(forward)
 
     def resizeEvent(self, a0):
         super().resizeEvent(a0)
         self.update_toolbar_position()
 
     def update_toolbar_position(self):
-        if self.tabs.currentIndex() == 0:
+        if self.slides_tabs.currentIndex() == 0:
             return
-        widget = self.tabs.currentWidget()
+
+        widget = self.slides_tabs.currentWidget()
 
         if not widget.is_toolbar_float():
             toolbar = widget.get_toolbar()
-            toolbar.setParent(self.tabs)
+            toolbar.setParent(self.slides_tabs)
             toolbar.show()
 
             if self.isFullScreen():
@@ -302,8 +297,8 @@ class MainWindow(QMainWindow):
                                     toolbar.sizeHint().width(), 40)
 
     def tab_changed(self, index):
-        for i in range(1, self.tabs.count()):
-            widget = self.tabs.widget(i)
+        for i in range(1, self.slides_tabs.count()):
+            widget = self.slides_tabs.widget(i)
             if not widget.is_toolbar_float():
                 widget.toolbar.hide()
 
@@ -314,11 +309,11 @@ class MainWindow(QMainWindow):
             self.setStyleSheet("")
 
     def set_touchable(self):
-        self.tabs.currentWidget().set_touchable(not self.action_touchable.isChecked())
+        self.slides_tabs.currentWidget().set_touchable(not self.action_touchable.isChecked())
 
     def close_tab_requested(self, index):
         if index > 0:
-            self.tabs.removeTab(index)
+            self.slides_tabs.removeTab(index)
 
     def open_slides(self, filename=None, page=0):
         # open pdf file
@@ -331,16 +326,16 @@ class MainWindow(QMainWindow):
             name = filename.split(os.sep)[-1].replace(".pdf", "")
             if os.path.exists(filename):
                 slides = Slides(self.config, filename, page)
-                slides.set_toolbar_float(self.cfg_tb_float.get_value() == 1, self.tabs)
+                slides.set_toolbar_float(self.cfg_tb_float.get_value() == 1, self.slides_tabs)
                 slides.play_code.connect(self.code_from_slide)
-                self.tabs.addTab(slides, name)
-                self.tabs.setCurrentWidget(slides)
+                self.slides_tabs.addTab(slides, name)
+                self.slides_tabs.setCurrentWidget(slides)
                 slides.view.setFocus()
 
     def closeEvent(self, a0):
         last = []
-        for i in range(1, self.tabs.count()):
-            widget = self.tabs.widget(i)
+        for i in range(1, self.slides_tabs.count()):
+            widget = self.slides_tabs.widget(i)
             if isinstance(widget, Slides):
                 last.append({"filename": widget.filename, "page": widget.page})
         self.cfg_last.set_value(last)
@@ -402,7 +397,8 @@ class MainWindow(QMainWindow):
         editor.language_editor.set_code(code)
         editor.language_editor.set_mode(1)
         editor.language_editor.setFocus()
-        self.tabs.setCurrentIndex(0)
+        self.slides_tabs.setCurrentIndex(0)
+        editor.show_all_code()
 
 
 def main():
@@ -411,6 +407,7 @@ def main():
     window.show()
 
     sys.exit(app.exec_())
+
 
 if __name__ == "__main__":
     main()

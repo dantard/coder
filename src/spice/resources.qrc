@@ -19,8 +19,6 @@
         <file>icons/hash.svg</file>
         <file>icons/play.svg</file>
         <file>icons/refresh.svg</file>
-
-
         <file>icons/plus.svg</file>
         <file>icons/minus.svg</file>
         <file>icons/minus_med.svg</file>
@@ -29,6 +27,7 @@
         <file>icons/cancel.svg</file>
         <file>icons/rectangle.svg</file>
         <file>icons/circle.svg</file>
+                <file>icons/radio-button.svg</file>
         </qresource>
 
 </RCC>

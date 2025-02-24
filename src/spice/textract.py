@@ -219,10 +219,12 @@ class Slides(QWidget):
         self.scene.status = mode
         self.scene.gum.setVisible(mode == GraphicsScene.ERASING)
 
+        print("jjjjjjjjjjjjjjjj", mode)
+
         if mode == GraphicsScene.POINTER:
-            self.view.setCursor(QCursor(create_cursor_image()))
+            self.view.viewport().setCursor(QCursor(create_cursor_image()))
         else:
-            self.view.setCursor(Qt.ArrowCursor)
+            self.view.viewport().setCursor(Qt.ArrowCursor)
 
     def set_color(self, color):
         for i, elem in enumerate(self.color_group):
