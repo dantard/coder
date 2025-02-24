@@ -97,15 +97,12 @@ class MainWindow(QMainWindow):
 
         general = self.config.root()
         self.cfg_dark = general.addCombobox("dark", pretty="Mode", items=["Light", "Dark"], default=0)
-        self.cfg_dark.value_changed.connect(lambda x: self.apply_color_scheme(x.get()))
-
         self.cfg_open_fullscreen = general.addCheckbox("open_fullscreen",
                                                        pretty="Open Fullscreen",
                                                        default=False)
 
         self.cfg_font_size = general.addCombobox("font_size", pretty="Font size", items=[str(i) for i in range(10, 33)],
                                                  default=0)
-        self.cfg_font_size.value_changed.connect(lambda x: self.change_font_size(int(x.get() + 10)))
         self.cfg_tb_float = general.addCombobox("tb_float",
                                                 pretty="Toolbar mode",
                                                 items=["Fixed", "Float"],
@@ -224,7 +221,12 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(helper)
 
         QTimer.singleShot(10, self.finish_config)
+
+        # Connect config after creation of widgets
         self.console_widget.done.connect(self.editors_tabs.currentWidget().language_editor.setFocus)
+        self.cfg_font_size.value_changed.connect(lambda x: self.change_font_size(int(x.get() + 10)))
+        self.cfg_dark.value_changed.connect(lambda x: self.apply_color_scheme(x.get()))
+
 
     def finish_config(self):
         self.splitter.setSizes([int(self.width() * 0.5), int(self.width() * 0.5)])
