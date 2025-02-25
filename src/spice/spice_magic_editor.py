@@ -4,7 +4,7 @@ import re
 import autopep8
 from PyQt5 import QtGui
 from PyQt5.QtCore import pyqtSignal, Qt, QTimer
-from PyQt5.QtGui import QFont, QFontMetrics, QColor, QPainter
+from PyQt5.QtGui import QFont, QFontMetrics, QColor, QPainter, QTextCursor
 from PyQt5.QtWidgets import QTextEdit, QHBoxLayout, QScrollBar, QApplication
 
 from spice.line_number_text_edit import LineNumberTextEdit
@@ -261,7 +261,33 @@ class SpiceMagicEditor(QTextEdit):
                 super().keyPressEvent(e)
         self.cursorPositionChanged.emit()
 
+    def indent_selected(self):
+        cursor = self.textCursor()
+
+        if not cursor.hasSelection():
+            return  # No selection, do nothing
+
+        # Get selected text (preserve newlines)
+        selected_text = cursor.selection().toPlainText()
+
+        # Add 4 spaces to each line
+        indented_text = "\n".join("    " + line for line in selected_text.splitlines())
+
+        # Replace selected text with indented version
+        cursor.beginEditBlock()  # Start undo-able action
+        cursor.insertText(indented_text)
+        cursor.endEditBlock()  # End undo-able action
+
+    def get_text_before_cursor(self, text_edit):
+        cursor = self.textCursor()
+        cursor.movePosition(QTextCursor.StartOfBlock, QTextCursor.KeepAnchor)  # Selecciona desde el inicio de la línea
+        return cursor.selectedText()
+
     def tab_pressed(self):
+
+        if self.textCursor().hasSelection():
+            self.indent_selected()
+            return
 
         current_line = self.get_current_line_text()
         current_words = re.split(r'\W+', self.toPlainText())
@@ -272,6 +298,7 @@ class SpiceMagicEditor(QTextEdit):
             self.moveCursor(QtGui.QTextCursor.End)
             self.suggestion = None
             return
+
         # it was just a tab
         if len(current_line) > 0 and current_line[-1] in " (:)":
             self.suggestion = None
