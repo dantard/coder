@@ -42,6 +42,7 @@ class EditorWidget(QWidget):
 
     def __init__(self, language_editor, console, config):
         super().__init__()
+        self.path = None
         self.config = config
         editor = config.root().addSubSection("editor", pretty="Editor")
         self.cfg_keep_code = editor.addCheckbox("keep_code",
@@ -50,9 +51,6 @@ class EditorWidget(QWidget):
         self.cfg_show_all = editor.addCheckbox("show_all",
                             pretty="Show all Code on Open",
                             default=False)
-        self.cfg_progs_path = editor.addFolderChoice("progs_path",
-                                                      pretty="Programs Path",
-                                                      default=str(os.getcwd()) + os.sep + "progs" + os.sep)
         self.cfg_autocomplete = editor.addString("autocomplete",
                                                   pretty="Autocomplete",
                                                   default="")
@@ -72,18 +70,6 @@ class EditorWidget(QWidget):
         self.language_editor = language_editor
         self.console = console
 
-        self.prog_cb = DynamicComboBox()
-        self.prog_cb.currentIndexChanged.connect(self.load_program)
-        font = QFont("Monospace")
-        font.setStyleHint(QFont.TypeWriter)
-        font.setPixelSize(16)
-        self.prog_cb.setFont(font)
-
-        q = QShortcut("Ctrl+S", self)
-        q.activated.connect(self.save_program)
-        q = QShortcut("Ctrl+Shift+S", self)
-        q.activated.connect(lambda : self.save_program(True))
-
         # Left side layout
         left_layout = QVBoxLayout()
 
@@ -91,11 +77,8 @@ class EditorWidget(QWidget):
         self.language_editor.info.connect(self.update_status_bar)
 
         bar = QToolBar()
-        bar.addWidget(self.prog_cb)
-        bar.addSeparator()
 
         a1 = bar.addAction("Play", self.execute_code)
-
         a2 = bar.addAction("Clear", self.clear)
         a3 = bar.addAction("Show", self.language_editor.show_code)
 
@@ -110,8 +93,6 @@ class EditorWidget(QWidget):
         self.text_edit_group = [a1, a2, a3, self.keep_banner]
         bar.addSeparator()
 
-        self.prog_cb.setMinimumWidth(300)
-
         left_layout.addWidget(bar)
         left_layout.addWidget(self.language_editor)
 
@@ -123,13 +104,6 @@ class EditorWidget(QWidget):
         self.setLayout(left_layout)
 
     def update_config(self):
-        print("updating config", self.cfg_progs_path.get_value())
-        if not os.path.exists(self.cfg_progs_path.get_value()):
-            QMessageBox.critical(self, "Warning", "The path " + self.cfg_progs_path.get_value() + " does not exist, using default")
-            self.cfg_progs_path.set_value(str(os.getcwd()))
-            print("risssss")
-
-        self.prog_cb.set_folder(self.cfg_progs_path.get_value())
         self.keep_banner.setChecked(self.cfg_keep_code.get())
         self.show_all.setChecked(self.cfg_show_all.get())
         self.language_editor.append_autocomplete(self.cfg_autocomplete.get())
@@ -140,47 +114,33 @@ class EditorWidget(QWidget):
         self.language_editor.set_font_size(font_size)
         self.console.set_font_size(font_size)
 
-    def load_program(self):
-        tab_wiget: QTabWidget = self.parent().parent() # noqa
-        index = tab_wiget.indexOf(self)
-        tab_wiget.setTabText(index, self.prog_cb.currentText())
-
-        if self.prog_cb.currentIndex() == 0:
-            self.clear()
-            return
-
-        file_name = self.prog_cb.currentText()
-
-        with open(self.cfg_progs_path.get() + os.sep + file_name) as f:
+    def load_program(self, path, show_all=False):
+        self.path = path
+        with open(path) as f:
             self.language_editor.set_code(f.read())
             self.console.clear()
 
-        if self.show_all.isChecked():
+        if self.show_all.isChecked() or show_all:
             self.show_all_code()
 
-    def save_program(self, save_as=False):
-        if self.prog_cb.currentIndex() > 0 and not save_as:
-            filename = self.cfg_progs_path.get_value() + os.sep + self.prog_cb.currentText()
-            ok = True
-        else:
+    def save_program(self, path, save_as):
+        if self.path is None or save_as:
             ext = self.console.get_file_extension()
-            path = self.cfg_progs_path.get_value() + os.sep
             filename, ok = QFileDialog.getSaveFileName(self, "Save code", filter="Language files (*" + ext + ")",
                                                        directory=path)
             if not filename:
                 return
 
-            filename = filename.replace(ext, "") + ext
-        if ok:
-            with open(filename, "w") as f:
-                f.write(self.language_editor.toPlainText())
-            print("saving in ", filename)
-            name = filename.split(os.sep)[-1]
-            self.prog_cb.populate(name)
-            tab_wiget: QTabWidget = self.parent().parent()  # noqa
-            index = tab_wiget.indexOf(self)
-            tab_wiget.setTabText(index, name)
-            self.sb.showMessage("Saved in " + filename, 2000)
+            self.path = filename.replace(".py","") + ".py"
+
+        with open(self.path, "w") as f:
+            f.write(self.language_editor.toPlainText())
+
+        name = os.path.basename(self.path)
+        tab_wiget: QTabWidget = self.parent().parent()  # noqa
+        index = tab_wiget.indexOf(self)
+        tab_wiget.setTabText(index, name)
+        self.sb.showMessage("Saved in " + self.path, 2000)
 
     def clear(self):
         self.prog_cb.setCurrentIndex(0)
@@ -214,8 +174,7 @@ class EditorWidget(QWidget):
         self.language_editor.set_delay(value)
 
     def show_all_code(self):
-        if QApplication.keyboardModifiers() or self.show_all.isChecked():
-            self.language_editor.show_all_code()
+        self.language_editor.show_all_code()
 
     def set_progs_path(self, path):
         value = self.prog_cb.currentText()

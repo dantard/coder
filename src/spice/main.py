@@ -3,7 +3,7 @@ import sys
 
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtWidgets import QApplication, QMainWindow, QSplitter, QPushButton, QVBoxLayout, QWidget, \
-    QTabWidget, QFileDialog, QShortcut, QTabBar, QMessageBox
+    QTabWidget, QFileDialog, QShortcut, QTabBar, QMessageBox, QToolBar
 from easyconfig2.easyconfig import EasyConfig2 as EasyConfig
 
 import spice.resources  # noqa
@@ -45,11 +45,12 @@ class MainWindow(QMainWindow):
         hidden = self.config.root().addHidden("parameters")
         self.cfg_last = hidden.addList("last", default=[])
 
-
         self.cfg_slides_path = general.addFolderChoice("slides_path",
                                                        pretty="Slides Path",
                                                        default=str(os.getcwd()) + os.sep + "slides" + os.sep)
-
+        self.cfg_progs_path = general.addFolderChoice("progs_path",
+                                                      pretty="Programs Path",
+                                                      default=str(os.getcwd()))
 
 
         self.dark = False
@@ -79,8 +80,20 @@ class MainWindow(QMainWindow):
         helper.setLayout(QVBoxLayout())
         helper.layout().addWidget(self.editors_tabs)
 
+        self.file_browser = FileBrowser(self.cfg_progs_path.get_value(), filters=["*.py", "*.pas"])
+        self.file_browser.signals.file_selected.connect(self.file_clicked)
         self.splitter = QSplitter(Qt.Horizontal)
-        #self.splitter.addWidget(FileBrowser("."))
+
+        helper2 = QWidget()
+        v_layout = QVBoxLayout()
+        helper2.setLayout(v_layout)
+        self.general_toolbar = QToolBar()
+        v_layout.addWidget(self.general_toolbar)
+        v_layout.addWidget(self.file_browser)
+        self.show_all_action = self.general_toolbar.addAction("load")
+        self.show_all_action.setCheckable(True)
+
+        self.splitter.addWidget(helper2)
         self.splitter.addWidget(helper)
         self.splitter.addWidget(self.console_widget)
         self.slides_tabs.addTab(self.splitter, "Code Execution")
@@ -130,6 +143,13 @@ class MainWindow(QMainWindow):
         q = QShortcut("Ctrl+L", self)
         q.activated.connect(self.toggle_fullscreen)
 
+        q = QShortcut("Ctrl+S", self)
+        q.activated.connect(self.save_requested)
+
+        q = QShortcut("Ctrl+Shift+S", self)
+        q.activated.connect(lambda : self.save_as_requested)
+
+
         for elem in self.cfg_last.get_value():
             self.open_slides(elem.get("filename"), elem.get("page", 0))
 
@@ -146,6 +166,21 @@ class MainWindow(QMainWindow):
 
         QTimer.singleShot(10, self.finish_config)
 
+
+    def save_requested(self):
+        self.editors_tabs.currentWidget().save_program(self.cfg_progs_path.get_value(), False)
+
+    def save_as_requested(self):
+        self.editors_tabs.currentWidget().save_program(self.cfg_progs_path.get_value(), True)
+
+
+    def file_clicked(self, path):
+        editor = EditorWidget(self.get_editor(), self.console_widget, self.config)
+        editor.load_program(path, self.show_all_action.isChecked())
+        self.editors_tabs.addTab(editor, os.path.basename(path))
+        editor.set_dark_mode(self.cfg_dark.get_value() == 1)
+        self.editors_tabs.setCurrentWidget(editor)
+        self.apply_config()
 
     def edit_config(self):
         if self.config.edit(min_width=400, min_height=400):
@@ -168,8 +203,6 @@ class MainWindow(QMainWindow):
             editor.update_config()
 
         self.console_widget.update_config()
-
-
 
     def modify_font_size(self, delta):
 
@@ -212,9 +245,9 @@ class MainWindow(QMainWindow):
     def editor_tab_changed(self, index):
         pass
 
-
     def finish_config(self):
-        self.splitter.setSizes([int(self.width() * 0.5), int(self.width() * 0.5)])
+        self.splitter.setSizes([int(self.width() * 0.15), int(self.width() * 0.4), int(self.width() * 0.4)])
+        # self.splitter.setSizes([int(self.width() * 0.5), int(self.width() * 0.5)])
         self.apply_config()
 
     def toggle_color_scheme(self):
