@@ -52,8 +52,8 @@ class SpiceMagicEditor(QTextEdit):
         self.set_font_size(font_size)
 
     def set_font_size(self, font_size):
-        font = QFont("Monospace")
-        font.setStyleHint(QFont.TypeWriter)
+        font = QFont("Courier New")
+        #font.setStyleHint(QFont.TypeWriter)
         font.setPixelSize(font_size)
         self.setFont(font)
         self.line_number_area.setFont(font)

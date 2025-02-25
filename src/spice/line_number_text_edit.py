@@ -1,5 +1,5 @@
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QTextCursor, QTextCharFormat, QColor
+from PyQt5.QtGui import QTextCursor, QTextCharFormat, QColor, QTextBlockFormat
 from PyQt5.QtWidgets import QTextEdit
 
 from spice.magic_scrollbar import MagicScrollBar
@@ -14,6 +14,7 @@ class LineNumberTextEdit(QTextEdit):
         self.setHorizontalScrollBar(MagicScrollBar())
         self.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
+
 
     def highlight_line(self, line_number):
         cursor = self.textCursor()
@@ -35,6 +36,14 @@ class LineNumberTextEdit(QTextEdit):
         highlight_format.setBackground(self.line_highlighter_color)
         cursor.setCharFormat(highlight_format)
         cursor.setPosition(position)
+
+        # blockFmt = QTextBlockFormat()
+        # blockFmt.setLineHeight(40, QTextBlockFormat.FixedHeight)
+        #
+        # theCursor = self.textCursor()
+        # theCursor.clearSelection()
+        # theCursor.select(QTextCursor.Document)
+        # theCursor.mergeBlockFormat(blockFmt)
 
     def set_line_highlighter_color(self, color):
         self.line_highlighter_color = color
