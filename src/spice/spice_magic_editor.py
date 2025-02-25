@@ -53,7 +53,7 @@ class SpiceMagicEditor(QTextEdit):
 
     def set_font_size(self, font_size):
         font = QFont("Courier New")
-        #font.setStyleHint(QFont.TypeWriter)
+        # font.setStyleHint(QFont.TypeWriter)
         font.setPixelSize(font_size)
         self.setFont(font)
         self.line_number_area.setFont(font)
@@ -278,7 +278,7 @@ class SpiceMagicEditor(QTextEdit):
         cursor.insertText(indented_text)
         cursor.endEditBlock()  # End undo-able action
 
-    def get_text_before_cursor(self, text_edit):
+    def get_text_before_cursor(self):
         cursor = self.textCursor()
         cursor.movePosition(QTextCursor.StartOfBlock, QTextCursor.KeepAnchor)  # Selecciona desde el inicio de la línea
         return cursor.selectedText()
@@ -289,48 +289,64 @@ class SpiceMagicEditor(QTextEdit):
             self.indent_selected()
             return
 
-        current_line = self.get_current_line_text()
-        current_words = re.split(r'\W+', self.toPlainText())
-
-        # it was just a tab
-        if len(current_line) == 0 or current_line.endswith("    "):
-            self.insertPlainText("    ")
-            self.moveCursor(QtGui.QTextCursor.End)
-            self.suggestion = None
-            return
-
-        # it was just a tab
-        if len(current_line) > 0 and current_line[-1] in " (:)":
-            self.suggestion = None
-            return
-
+        # Let see if we have some autocomplete candidates
         if self.suggestion is None:
-            unfinished_word = re.split(r"[+\-*/= ]", current_line)
-            if len(unfinished_word) == 0 or len(unfinished_word[-1]) == 0:
-                return
-            unfinished_word = unfinished_word[-1]
-            word_set = list(set(current_words + self.highlighter.get_keywords() + self.autocomplete_words))
+            current_words = re.split(r'\W+', self.toPlainText())
+            text_before_cursor = self.get_text_before_cursor()
+            words_before_cursos = re.split(r"[+\-*/= ]", text_before_cursor)
+            self.candidates = []
+            if words_before_cursos[-1] != "":
+                word_set = list(set(current_words + self.highlighter.get_keywords() + self.autocomplete_words))
+                self.candidates = [word for word in word_set if word.startswith(words_before_cursos[-1])]
+                self.candidates.remove(words_before_cursos[-1])
+                self.candidates.append(words_before_cursos[-1])
+                self.suggestion = words_before_cursos[-1]
 
-            # We want unfinished_word to be the last one
-            if unfinished_word in word_set:
-                word_set.remove(unfinished_word)
+        if len(self.candidates) > 1:
+            # Remove the current suggestion
+            for _ in range(len(self.suggestion)):
+                self.textCursor().deletePreviousChar()
+            self.candidates.append(self.suggestion)
+            self.suggestion = self.candidates.pop(0)
+            self.insertPlainText(self.suggestion)
+        else:
+            self.insertPlainText("    ")
 
-            self.candidates = [word for word in word_set if word.startswith(unfinished_word)]
-            if len(self.candidates) == 0:
-                self.insertPlainText("    ")
-                return
-            elif len(self.candidates) == 1:
-                self.insertPlainText(self.candidates[0][len(unfinished_word):])
-                self.moveCursor(QtGui.QTextCursor.End)
-                return
-            else:
-                self.suggestion = unfinished_word
 
-        for _ in range(len(self.suggestion)):
-            self.textCursor().deletePreviousChar()
-        self.candidates.append(self.suggestion)
-        self.suggestion = self.candidates.pop(0)
-        self.insertPlainText(self.suggestion)
+
+        # if len(self.candidates) > 0:
+
+        # current_line = self.get_current_line_text()
+        #
+        # # it was just a tab
+        # if len(current_line) == 0 or current_line.endswith("    "):
+        #     self.insertPlainText("    ")
+        #     self.moveCursor(QtGui.QTextCursor.End)
+        #     self.suggestion = None
+        #     return
+        #
+        # # it was just a tab
+        # if len(current_line) > 0 and current_line[-1] in " (:)":
+        #     self.suggestion = None
+        #     return
+        #
+        # if self.suggestion is None:
+        #
+        #     if len(self.candidates) == 0:
+        #         self.insertPlainText("    ")
+        #         return
+        #     elif len(self.candidates) == 1:
+        #         self.insertPlainText(self.candidates[0][len(unfinished_word):])
+        #         self.moveCursor(QtGui.QTextCursor.End)
+        #         return
+        #     else:
+        #         self.suggestion = unfinished_word
+        #
+        # for _ in range(len(self.suggestion)):
+        #     self.textCursor().deletePreviousChar()
+        # self.candidates.append(self.suggestion)
+        # self.suggestion = self.candidates.pop(0)
+        # self.insertPlainText(self.suggestion)
 
     def get_next_line(self):
         count = self.count

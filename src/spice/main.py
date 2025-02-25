@@ -9,6 +9,7 @@ from easyconfig2.easyconfig import EasyConfig2 as EasyConfig
 import spice.resources  # noqa
 from spice.dialogs import Author
 from spice.editor_widget import EditorWidget
+from spice.file_browser import FileBrowser
 from spice.highlighter import PythonHighlighter, PascalHighlighter
 from spice.spice_magic_editor import PythonEditor, PascalEditor
 from spice.spice_console import JupyterConsole, TermQtConsole
@@ -79,6 +80,7 @@ class MainWindow(QMainWindow):
         helper.layout().addWidget(self.editors_tabs)
 
         self.splitter = QSplitter(Qt.Horizontal)
+        #self.splitter.addWidget(FileBrowser("."))
         self.splitter.addWidget(helper)
         self.splitter.addWidget(self.console_widget)
         self.slides_tabs.addTab(self.splitter, "Code Execution")
