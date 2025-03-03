@@ -203,6 +203,7 @@ class MainWindow(QMainWindow):
             editor.update_config()
 
         self.console_widget.update_config()
+        self.file_browser.set_root(self.cfg_progs_path.get_value())
 
     def modify_font_size(self, delta):
 

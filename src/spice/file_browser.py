@@ -17,6 +17,7 @@ class Tree(QTreeView):
 
     def contextMenuEvent(self, a0: QtGui.QContextMenuEvent) -> None:
         super().contextMenuEvent(a0)
+        return
         indexes = self.selectedIndexes()
         if indexes:
             index = self.indexAt(a0.pos())
