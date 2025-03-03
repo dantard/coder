@@ -143,7 +143,6 @@ class EditorWidget(QWidget):
         self.sb.showMessage("Saved in " + self.path, 2000)
 
     def clear(self):
-        self.prog_cb.setCurrentIndex(0)
         self.language_editor.clear()
         # self.console_widget.clear()
 

@@ -27,7 +27,8 @@
         <file>icons/cancel.svg</file>
         <file>icons/rectangle.svg</file>
         <file>icons/circle.svg</file>
-                <file>icons/radio-button.svg</file>
+        <file>icons/radio-button.svg</file>
+        <file>icons/folder.svg</file>
         </qresource>
 
 </RCC>

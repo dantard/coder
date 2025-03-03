@@ -2,6 +2,7 @@ import os
 import sys
 
 from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import QApplication, QMainWindow, QSplitter, QPushButton, QVBoxLayout, QWidget, \
     QTabWidget, QFileDialog, QShortcut, QTabBar, QMessageBox, QToolBar
 from easyconfig2.easyconfig import EasyConfig2 as EasyConfig
@@ -90,8 +91,13 @@ class MainWindow(QMainWindow):
         self.general_toolbar = QToolBar()
         v_layout.addWidget(self.general_toolbar)
         v_layout.addWidget(self.file_browser)
-        self.show_all_action = self.general_toolbar.addAction("load")
+        self.show_all_action = self.general_toolbar.addAction("Show all code")
+        self.show_all_action.setIcon(QIcon(":/icons/radio-button.svg"))
         self.show_all_action.setCheckable(True)
+
+        self.new_dir = self.general_toolbar.addAction("New Folder")
+        self.new_dir.setIcon(QIcon(":/icons/folder.svg"))
+        self.new_dir.triggered.connect(self.file_browser.new_folder)
 
         self.splitter.addWidget(helper2)
         self.splitter.addWidget(helper)

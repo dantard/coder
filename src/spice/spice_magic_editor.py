@@ -298,8 +298,9 @@ class SpiceMagicEditor(QTextEdit):
             if words_before_cursos[-1] != "":
                 word_set = list(set(current_words + self.highlighter.get_keywords() + self.autocomplete_words))
                 self.candidates = [word for word in word_set if word.startswith(words_before_cursos[-1])]
-                self.candidates.remove(words_before_cursos[-1])
-                self.candidates.append(words_before_cursos[-1])
+                if words_before_cursos[-1] in self.candidates:
+                    self.candidates.remove(words_before_cursos[-1])
+                    self.candidates.append(words_before_cursos[-1])
                 self.suggestion = words_before_cursos[-1]
 
         if len(self.candidates) > 1:
