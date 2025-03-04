@@ -209,7 +209,7 @@ class SpiceMagicEditor(QTextEdit):
             self.set_mode(0 if self.mode == 1 else 0)
 
         if self.mode == 1:
-            print("mode1")
+
             if e.key() == Qt.Key_Down:
                 self.show_all_code()
             elif e.key() == Qt.Key_Control:

@@ -219,8 +219,6 @@ class Slides(QWidget):
         self.scene.status = mode
         self.scene.gum.setVisible(mode == GraphicsScene.ERASING)
 
-        print("jjjjjjjjjjjjjjjj", mode)
-
         if mode == GraphicsScene.POINTER:
             self.view.viewport().setCursor(QCursor(create_cursor_image()))
         else:

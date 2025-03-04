@@ -200,11 +200,7 @@ class MainWindow(QMainWindow):
             for i in range(1, self.slides_tabs.count()):
                 self.slides_tabs.widget(i).set_toolbar_float(self.cfg_tb_float.get_value() == 1, self.slides_tabs)
 
-        print("WTFF")
-
         for i in range(self.editors_tabs.count()):
-            print("WTFF", i)
-
             editor = self.editors_tabs.widget(i)
             editor.update_config()
 
@@ -223,7 +219,6 @@ class MainWindow(QMainWindow):
         self.cfg_font_size.set_value(goal - 10)
 
     def set_font_size(self, x):
-        print("WTF")
         for i in range(0, self.editors_tabs.count()):
             self.editors_tabs.widget(i).set_font_size(x)
         self.console_widget.set_font_size(x)

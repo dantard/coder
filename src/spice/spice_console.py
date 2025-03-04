@@ -92,7 +92,6 @@ class JupyterConsole(SpiceConsole):
             self.jupyter_widget.execute("cd " + path, hidden=True)
 
         size = self.config.font_size.get()
-        print("setting font size to ", size)
 
         if size>=0:
             self.set_font_size(size + 10)

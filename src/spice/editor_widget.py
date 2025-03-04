@@ -44,17 +44,17 @@ class EditorWidget(QWidget):
         super().__init__()
         self.path = None
         self.config = config
-        editor = config.root().addSubSection("editor", pretty="Editor")
-        self.cfg_keep_code = editor.addCheckbox("keep_code",
+        editor = config.root().getSubSection("editor", pretty="Editor")
+        self.cfg_keep_code = editor.getCheckBox("keep_code",
                             pretty="Keep Code on Run",
                             default=False)
-        self.cfg_show_all = editor.addCheckbox("show_all",
+        self.cfg_show_all = editor.getCheckBox("show_all",
                             pretty="Show all Code on Open",
                             default=False)
-        self.cfg_autocomplete = editor.addString("autocomplete",
+        self.cfg_autocomplete = editor.getString("autocomplete",
                                                   pretty="Autocomplete",
                                                   default="")
-        self.cfg_delay = editor.addSlider("delay",
+        self.cfg_delay = editor.getSlider("delay",
                                            pretty="Delay",
                                            min=0, max=100,
                                            default=25,
@@ -62,7 +62,7 @@ class EditorWidget(QWidget):
                                            show_value=True,
                                            suffix=" ms")
 
-        self.cfg_show_sb = editor.addCheckbox("show_tb",
+        self.cfg_show_sb = editor.getCheckBox("show_tb",
                                                pretty="Show Toolbar",
                                                default=False)
 
