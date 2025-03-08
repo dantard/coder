@@ -104,6 +104,8 @@ class MainWindow(QMainWindow):
         self.splitter.addWidget(self.console_widget)
         self.slides_tabs.addTab(self.splitter, "Code Execution")
 
+        self.last_pdf_tab_index = None
+
         helper = QWidget()
         helper.setContentsMargins(0, 0, 0, 0)
         helper.setLayout(QVBoxLayout())
@@ -155,6 +157,9 @@ class MainWindow(QMainWindow):
         q = QShortcut("Ctrl+Shift+S", self)
         q.activated.connect(lambda : self.save_as_requested)
 
+        q = QShortcut("Ctrl+Tab", self)
+        q.activated.connect(self.toggle_between_code_and_pdf)
+
 
         for elem in self.cfg_last.get_value():
             self.open_slides(elem.get("filename"), elem.get("page", 0))
@@ -178,6 +183,26 @@ class MainWindow(QMainWindow):
 
     def save_as_requested(self):
         self.editors_tabs.currentWidget().save_program(self.cfg_progs_path.get_value(), True)
+
+    def toggle_between_code_and_pdf(self):
+        """
+        Toggle between the Code Execution tab and the most recently viewed PDF tab.
+        If no PDF tab is open, this function does nothing when on the Code Execution tab.
+        """
+        current_index = self.slides_tabs.currentIndex()
+
+        if current_index == 0:  # Currently on Code Execution tab
+
+            # Switch to the most recently viewed PDF tab, if defined, or to the first one, if it exists
+            if self.last_pdf_tab_index is not None and self.slides_tabs.count() > self.last_pdf_tab_index:
+                self.slides_tabs.setCurrentIndex(self.last_pdf_tab_index)
+            elif self.slides_tabs.count() > 1:
+                self.slides_tabs.setCurrentIndex(1)
+        else:  # Currently on a PDF tab
+            # Store the current PDF tab index
+            self.last_pdf_tab_index = current_index
+            # Switch to Code Execution tab
+            self.slides_tabs.setCurrentIndex(0)
 
 
     def file_clicked(self, path):
