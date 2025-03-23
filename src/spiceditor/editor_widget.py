@@ -108,7 +108,7 @@ class EditorWidget(QWidget):
         self.show_all.setChecked(self.cfg_show_all.get())
         self.language_editor.append_autocomplete(self.cfg_autocomplete.get())
         self.language_editor.set_delay(self.cfg_delay.get())
-        self.language_editor.set_font_size(self.config.font_size.get() + 10)
+        #self.language_editor.set_font_size(self.config.font_size.get() + 10)
 
     def set_font_size(self, font_size):
         self.language_editor.set_font_size(font_size)
