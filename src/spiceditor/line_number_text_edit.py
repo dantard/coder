@@ -2,7 +2,7 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QTextCursor, QTextCharFormat, QColor, QTextBlockFormat
 from PyQt5.QtWidgets import QTextEdit
 
-from spice.magic_scrollbar import MagicScrollBar
+from spiceditor.magic_scrollbar import MagicScrollBar
 
 
 class LineNumberTextEdit(QTextEdit):

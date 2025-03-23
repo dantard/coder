@@ -7,8 +7,8 @@ from PyQt5.QtCore import pyqtSignal, Qt, QTimer
 from PyQt5.QtGui import QFont, QFontMetrics, QColor, QPainter, QTextCursor
 from PyQt5.QtWidgets import QTextEdit, QHBoxLayout, QScrollBar, QApplication
 
-from spice.line_number_text_edit import LineNumberTextEdit
-from spice.magic_scrollbar import MagicScrollBar
+from spiceditor.line_number_text_edit import LineNumberTextEdit
+from spiceditor.magic_scrollbar import MagicScrollBar
 
 
 class SpiceMagicEditor(QTextEdit):

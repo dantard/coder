@@ -4,9 +4,9 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont, QIcon
 from PyQt5.QtWidgets import QVBoxLayout, QToolBar, QStatusBar, QWidget, QComboBox, QShortcut, QTabWidget, QFileDialog, \
     QApplication, QDialog, QMessageBox
-from spice import utils
+from spiceditor import utils
 
-import spice.resources  # noqa
+import spiceditor.resources  # noqa
 
 
 class DynamicComboBox(QComboBox):

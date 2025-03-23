@@ -1,8 +1,8 @@
 from setuptools import setup, find_packages
 
 setup(
-    name='spice',
-    version='0.0.4',
+    name='spiceditor',
+    version='0.0.5',
     packages=find_packages(where='src'),  # Specify src directory
     package_dir={'': 'src'},  # Tell setuptools that packages are under src
     install_requires=[
@@ -28,7 +28,7 @@ setup(
     python_requires='>=3.10',
     entry_points={
         'console_scripts': [
-            'spice=spice.main:main',
+            'spice=spiceditor.main:main',
         ],
     }
 )

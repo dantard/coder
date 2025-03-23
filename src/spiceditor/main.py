@@ -7,14 +7,14 @@ from PyQt5.QtWidgets import QApplication, QMainWindow, QSplitter, QPushButton, Q
     QTabWidget, QFileDialog, QShortcut, QTabBar, QMessageBox, QToolBar
 from easyconfig2.easyconfig import EasyConfig2 as EasyConfig
 
-import spice.resources  # noqa
-from spice.dialogs import Author
-from spice.editor_widget import EditorWidget
-from spice.file_browser import FileBrowser
-from spice.highlighter import PythonHighlighter, PascalHighlighter
-from spice.spice_magic_editor import PythonEditor, PascalEditor
-from spice.spice_console import JupyterConsole, TermQtConsole
-from spice.textract import Slides
+import spiceditor.resources  # noqa
+from spiceditor.dialogs import Author
+from spiceditor.editor_widget import EditorWidget
+from spiceditor.file_browser import FileBrowser
+from spiceditor.highlighter import PythonHighlighter, PascalHighlighter
+from spiceditor.spice_magic_editor import PythonEditor, PascalEditor
+from spiceditor.spice_console import JupyterConsole, TermQtConsole
+from spiceditor.textract import Slides
 
 
 class CustomTabBar(QTabBar):
@@ -69,7 +69,7 @@ class MainWindow(QMainWindow):
         self.console_widget = JupyterConsole(self.config)
         self.base_editor = EditorWidget(self.get_editor(), self.console_widget, self.config)
 
-        self.config.load("spice.yaml")
+        self.config.load("spiceditor.yaml")
 
         self.editors_tabs = QTabWidget()
         self.editors_tabs.addTab(self.base_editor, "Code")
@@ -190,7 +190,7 @@ class MainWindow(QMainWindow):
 
     def edit_config(self):
         if self.config.edit(min_width=400, min_height=400):
-            self.config.save("spice.yaml")
+            self.config.save("spiceditor.yaml")
             self.apply_config()
 
     def apply_config(self):
@@ -361,7 +361,7 @@ class MainWindow(QMainWindow):
             if isinstance(widget, Slides):
                 last.append({"filename": widget.filename, "page": widget.page})
         self.cfg_last.set_value(last)
-        self.config.save("spice.yaml")
+        self.config.save("spiceditor.yaml")
 
     # def contextMenuEvent(self, event):
     #     menu = QMenu(self)
