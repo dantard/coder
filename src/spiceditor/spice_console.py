@@ -88,14 +88,14 @@ class JupyterConsole(SpiceConsole):
 
     def update_config(self, **kwargs):
         pass 
-        #TODO:path = self.config.progs_path.get()
-        # if path:
-        #     self.jupyter_widget.execute("cd " + path, hidden=True)
-        #
-        # size = self.config.font_size.get()
-        #
-        # if size>=0:
-        #     self.set_font_size(size + 10)
+        path = self.config.root().get_node("progs_path").get_value()
+        if path:
+            self.jupyter_widget.execute("cd " + path, hidden=True)
+
+        size = self.config.root().get_node("font_size").get_value()
+
+        if size>=0:
+            self.set_font_size(size + 10)
 
     def set_dark_mode(self, value):
         if value:

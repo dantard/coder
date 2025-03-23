@@ -2,7 +2,7 @@ import os
 import shutil
 
 from PyQt5 import QtGui
-from PyQt5.QtCore import QObject, pyqtSignal, QDir, QItemSelectionModel, QModelIndex, Qt
+from PyQt5.QtCore import QObject, pyqtSignal, QDir, QItemSelectionModel, QModelIndex, Qt, QTimer
 from PyQt5.QtWidgets import QWidget, QTreeView, QFileSystemModel, QVBoxLayout, QPushButton, QHBoxLayout, QLabel, QMenu, QMessageBox, QToolBar, QInputDialog
 
 
@@ -37,6 +37,7 @@ class FileBrowser(QWidget):
 
     def __init__(self, path, filters=None, hide_details=True):
         super().__init__()
+        self.current_files = []
         if filters is None:
             filters = ["*.pdf"]
         self.signals = self.Signals()
@@ -45,7 +46,7 @@ class FileBrowser(QWidget):
         self.treeview.delete_requested.connect(self.delete_requested)
         self.dirModel = QFileSystemModel()
         self.dirModel.directoryLoaded.connect(self.treeview.filter_rows)
-        self.dirModel.setNameFilters(filters)
+        #self.dirModel.setNameFilters(filters)
         self.dirModel.setNameFilterDisables(False)
 
         self.treeview.setModel(self.dirModel)
@@ -77,6 +78,8 @@ class FileBrowser(QWidget):
             os.remove(path)
 
 
+
+
     def on_double_clicked(self, index):
         # Map the proxy index to the source model index
         path = self.dirModel.fileInfo(index).absoluteFilePath()
@@ -90,8 +93,16 @@ class FileBrowser(QWidget):
             index = index.parent()
             self.set_root_index(index)
 
+    def refresh(self):
+        files = [str(x) for x in os.listdir(self.path)]
+        if files != self.current_files:
+            self.current_files = files
+        self.dirModel.setRootPath("")
+        self.dirModel.setRootPath(self.path)
+
     def set_root(self, path):
         self.treeview.setRootIndex(self.dirModel.setRootPath(path))
+        self.current_files = [str(x) for  x in os.listdir(path)]
 
     def set_root_index(self, index):
         self.treeview.setRootIndex(index)
