@@ -27,10 +27,9 @@ class CustomTabBar(QTabBar):
 
 class MainWindow(QMainWindow):
 
-    def __init__(self):
+    def __init__(self, console):
         super().__init__()
         self.config = EasyConfig(immediate=True)
-
         general = self.config.root()
         self.cfg_dark = general.addCombobox("dark", pretty="Mode", items=["Light", "Dark"], default=0)
         self.cfg_open_fullscreen = general.addCheckbox("open_fullscreen",
@@ -65,11 +64,13 @@ class MainWindow(QMainWindow):
         self.slides_tabs.tabCloseRequested.connect(self.close_tab_requested)
         self.slides_tabs.currentChanged.connect(self.tab_changed)
         self.slides_tabs.tabBar().setTabButton(0, QTabBar.ButtonPosition.RightSide, None)
+        self.console_widget = console(self.config)
 
-        self.console_widget = JupyterConsole(self.config)
         self.base_editor = EditorWidget(self.get_editor(), self.console_widget, self.config)
 
+
         self.config.load("spiceditor.yaml")
+        self.console_widget.config_read()
 
         self.editors_tabs = QTabWidget()
         self.editors_tabs.addTab(self.base_editor, "Code")
@@ -128,7 +129,7 @@ class MainWindow(QMainWindow):
             m1.clear()
             path = self.cfg_slides_path.get_value() + os.sep
             if not os.path.exists(path):
-                os.makedirs(path)
+                return
             for filename in os.listdir(path):
                 m1.addAction(filename, lambda x=filename, y=filename: self.open_slides(path + y))
 
@@ -363,47 +364,6 @@ class MainWindow(QMainWindow):
         self.cfg_last.set_value(last)
         self.config.save("spiceditor.yaml")
 
-    # def contextMenuEvent(self, event):
-    #     menu = QMenu(self)
-    #     m1 = menu.addAction("Fullscreen")
-    #     menu.addSeparator()
-    #     m1.setCheckable(True)
-    #     m1.setChecked(self.isFullScreen())
-    #     m1.triggered.connect(self.toggle_fullscreen)
-    #
-    #     if os.path.exists("slides"):
-    #         m2 = menu.addMenu("Slides")
-    #
-    #         def fill():
-    #             pwd = os.getcwd()
-    #             for filename in os.listdir("slides"):
-    #                 m2.addAction(filename,
-    #                              lambda x=filename, y=filename: self.open_slides(pwd + os.sep + "slides" + os.sep + y))
-    #
-    #         m2.aboutToShow.connect(fill)
-    #
-    #     menu.addAction("Open", self.open_slides)
-    #     menu.addSeparator()
-    #     m3 = menu.addMenu("Mode")
-    #
-    #     # NONE = 0
-    #     # POINTER = 1
-    #     # WRITING = 2
-    #     # ERASING = 3
-    #     # RECTANGLES = 4
-    #     # ELLIPSES = 5
-    #
-    #     m3.addAction("None", lambda: self.set_writing_mode(0))
-    #     m3.addAction("Pointer", lambda: self.set_writing_mode(1))
-    #     m3.addAction("Write", lambda: self.set_writing_mode(2))
-    #     m3.addAction("Erase", lambda: self.set_writing_mode(3))
-    #     m3.addAction("Rectangles", lambda: self.set_writing_mode(4))
-    #     m3.addAction("Ellipses", lambda: self.set_writing_mode(5))
-    #
-    #     menu.addAction("Exit", self.close)
-    #
-    #     menu.exec_(event.globalPos())
-
     def toggle_fullscreen(self):
         if self.isFullScreen():
             self.showNormal()
@@ -423,13 +383,4 @@ class MainWindow(QMainWindow):
         editor.show_all_code()
 
 
-def main():
-    app = QApplication(sys.argv)
-    window = MainWindow()
-    window.show()
 
-    sys.exit(app.exec_())
-
-
-if __name__ == "__main__":
-    main()

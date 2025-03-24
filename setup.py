@@ -28,7 +28,8 @@ setup(
     python_requires='>=3.10',
     entry_points={
         'console_scripts': [
-            'spice=spiceditor.main:main',
+            'spice=spiceditor.spice:main',
+            'spiceterm=spiceditor.spiceterm:main',
         ],
     }
 )

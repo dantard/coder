@@ -93,14 +93,9 @@ class FileBrowser(QWidget):
             index = index.parent()
             self.set_root_index(index)
 
-    def refresh(self):
-        files = [str(x) for x in os.listdir(self.path)]
-        if files != self.current_files:
-            self.current_files = files
-        self.dirModel.setRootPath("")
-        self.dirModel.setRootPath(self.path)
-
     def set_root(self, path):
+        if not os.path.exists(path):
+            return
         self.treeview.setRootIndex(self.dirModel.setRootPath(path))
         self.current_files = [str(x) for  x in os.listdir(path)]
 

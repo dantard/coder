@@ -9,35 +9,6 @@ from spiceditor import utils
 import spiceditor.resources  # noqa
 
 
-class DynamicComboBox(QComboBox):
-    def __init__(self, folder=None, parent=None):
-        super().__init__(parent)
-        self.folder = folder
-        self.populate()
-
-    def set_folder(self, folder):
-        self.folder = folder
-        self.populate()
-
-
-    def populate(self, item=None):
-        self.blockSignals(True)
-        self.clear()  # Clear the current items
-        self.addItem("[Free Coding]")
-        if self.folder is not None and os.path.exists(self.folder):
-            files = list(x for x in os.listdir(self.folder) if x.endswith(".py"))
-
-            files = [f for f in files if os.path.isfile(os.path.join(self.folder, f))]
-            files.sort()
-            self.addItems(files)
-            if item is not None:
-                index = self.findText(item)
-                if index >=0:
-                    self.setCurrentIndex(index)
-            self.blockSignals(False)
-
-
-
 class EditorWidget(QWidget):
 
     def __init__(self, language_editor, console, config):

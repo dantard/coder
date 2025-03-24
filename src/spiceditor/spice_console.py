@@ -58,6 +58,7 @@ class JupyterConsole(SpiceConsole):
         kernel_client.start_channels()
 
         self.jupyter_widget = RichJupyterWidget()
+
         font = QFont("Monospace")
         font.setStyleHint(QFont.TypeWriter)
         font.setPixelSize(18)
@@ -167,10 +168,11 @@ import platform
 class TermQtConsole(SpiceConsole):
     def __init__(self, config):
         super().__init__(config)
-        self.terminal = Terminal(400, 600, font_size=18)
+        self.terminal = Terminal(600, 400, font_size=18)
         layout = QVBoxLayout()
         layout.addWidget(self.terminal)
         self.setLayout(layout)
+        self.setMinimumSize(600,400)
 
         my_platform = platform.system()
 
@@ -206,6 +208,12 @@ class TermQtConsole(SpiceConsole):
         self.terminal.resize_callback = terminal_io.resize
         terminal_io.spawn()
         # self.terminal.input("python")
+        self.set_config(config)
+
+        QTimer.singleShot(100, lambda : self.resize(0))
+
+    def resize(self, a0):
+        self.terminal.resize(self.width(), self.height())
 
     def set_config(self, config: EasyConfig2):
         super().set_config(config)
@@ -213,10 +221,12 @@ class TermQtConsole(SpiceConsole):
         self.init = terminal.addString("init", pretty="Init command (e.g. python)")
         self.temp_file = terminal.addString("temp_file", pretty="Temp file name")
         self.command = terminal.addString("command", pretty="Command")
-        self.file_extension = terminal.addCombobox("file_extension", pretty="File extension", items=[".py", ".pas"])
+        #self.file_extension = terminal.addCombobox("file_extension", pretty="File extension", items=[".py", ".pas"])
 
     def config_read(self):
         super().config_read()
+
+        print("config read")
         init = self.init.get_value()
         if init is not None:
             init += "\n"
@@ -234,6 +244,8 @@ class TermQtConsole(SpiceConsole):
         if command is not None and command.strip():
             command += "\r\n"
             self.terminal.input(command.encode("utf-8"))
+
+        self.terminal.input("\n".encode("utf-8"))
 
     def clear(self):
         self.terminal.input("clear\r\n".encode("utf-8"))
