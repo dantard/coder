@@ -3,7 +3,7 @@ import re
 
 import autopep8
 from PyQt5 import QtGui
-from PyQt5.QtCore import pyqtSignal, Qt, QTimer
+from PyQt5.QtCore import pyqtSignal, Qt, QTimer, QMimeData
 from PyQt5.QtGui import QFont, QFontMetrics, QColor, QPainter, QTextCursor
 from PyQt5.QtWidgets import QTextEdit, QHBoxLayout, QScrollBar, QApplication
 
@@ -50,6 +50,11 @@ class SpiceMagicEditor(QTextEdit):
             self.highlighter.setDocument(self.document())
 
         self.set_font_size(font_size)
+
+    def insertFromMimeData(self, source: QMimeData):
+        """Override paste behavior to insert plain text only."""
+        if source.hasText():
+            self.insertPlainText(source.text())
 
     def set_font_size(self, font_size):
         font = QFont("Courier New")

@@ -88,7 +88,7 @@ class JupyterConsole(SpiceConsole):
         pass
 
     def update_config(self, **kwargs):
-        pass 
+        pass
         path = self.config.root().get_node("progs_path").get_value()
         if path:
             self.jupyter_widget.execute("cd " + path, hidden=True)
@@ -136,18 +136,16 @@ class JupyterConsole(SpiceConsole):
         import sys
         import os
         import importlib
-
+        
         cwd = os.getcwd()
-
-        # Identify modules that are imported from the current directory
-        user_modules = [m for m in sys.modules if hasattr(
-            sys.modules[m], '__file__') and sys.modules[m].__file__ and sys.modules[m].__file__.startswith(cwd)]
-
-        for m in user_modules:
-            print("Reloading ", m, type(m))
-            importlib.reload(sys.modules[m])
-
-
+        
+        for module in sys.modules:
+            if module is None:
+                continue
+        
+            if hasattr(module, '__file__') and module.__file__ and module.__file__.startswith(cwd):
+                print("ole",  module.__file__)
+                importlib.reload(module)               
         '''
         self.jupyter_widget.execute(clearer, hidden=True)
         QTimer.singleShot(100, run)
