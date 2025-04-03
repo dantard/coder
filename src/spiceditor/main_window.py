@@ -29,6 +29,8 @@ class MainWindow(QMainWindow):
 
     def __init__(self, console):
         super().__init__()
+        self.show_iter = 0
+        self.sizes = None
         self.config = EasyConfig(immediate=True)
         general = self.config.root()
         self.cfg_dark = general.addCombobox("dark", pretty="Mode", items=["Light", "Dark"], default=0)
@@ -82,7 +84,7 @@ class MainWindow(QMainWindow):
         helper.setLayout(QVBoxLayout())
         helper.layout().addWidget(self.editors_tabs)
 
-        self.file_browser = FileBrowser(self.cfg_progs_path.get_value(), filters=["*.py", "*.pas"])
+        self.file_browser = FileBrowser(self.cfg_progs_path.get_value(), filters=[".py", ".csv", ".txt", ".yaml"],)
         self.file_browser.signals.file_selected.connect(self.file_clicked)
         self.splitter = QSplitter(Qt.Horizontal)
 
@@ -116,8 +118,6 @@ class MainWindow(QMainWindow):
         file = menu.addMenu("File")
         file.addAction("Open", self.open_slides)
         m1 = file.addMenu("Slides")
-        file.addSeparator()
-        file.addAction("Save Code", self.save_as)
         file.addSeparator()
         file.addAction("Exit", self.close)
         m3 = menu.addMenu("Edit")
@@ -154,7 +154,10 @@ class MainWindow(QMainWindow):
         q.activated.connect(self.save_requested)
 
         q = QShortcut("Ctrl+Shift+S", self)
-        q.activated.connect(lambda : self.save_as_requested)
+        q.activated.connect(lambda : self.save_as_requested())
+
+        q = QShortcut("Ctrl+K", self)
+        q.activated.connect(self.show_only)
 
 
         for elem in self.cfg_last.get_value():
@@ -172,6 +175,19 @@ class MainWindow(QMainWindow):
         self.cfg_dark.value_changed.connect(lambda x: self.apply_color_scheme(x.get()))
 
         QTimer.singleShot(10, self.finish_config)
+
+
+    def show_only(self):
+        if self.show_iter == 0:
+            self.sizes = self.splitter.sizes()
+
+        self.show_iter = (self.show_iter + 1) % 3
+        if self.show_iter == 1:
+            self.splitter.setSizes([0, 0, int(self.width() * 0.4)])
+        elif self.show_iter == 2:
+            self.splitter.setSizes([0, int(self.width() * 0.4), 0])
+        else:
+            self.splitter.setSizes(self.sizes)
 
 
     def save_requested(self):
@@ -291,9 +307,6 @@ class MainWindow(QMainWindow):
 
         super().keyPressEvent(a0)
 
-    def save_as(self):
-        self.editors_tabs.currentWidget().save_program()
-
     def move_to(self, forward):
         self.slides_tabs.currentWidget().move_to(forward)
 
@@ -375,8 +388,13 @@ class MainWindow(QMainWindow):
 
     def code_from_slide(self, code):
         editor = self.editors_tabs.currentWidget()
+
         editor.language_editor.set_text("")
-        editor.language_editor.set_code(code)
+        if QApplication.keyboardModifiers() == Qt.ControlModifier:
+            editor.language_editor.set_code(editor.language_editor.code + "\n" + code)
+        else:
+            editor.language_editor.set_code(code)
+
         editor.language_editor.set_mode(1)
         editor.language_editor.setFocus()
         self.slides_tabs.setCurrentIndex(0)

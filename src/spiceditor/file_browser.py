@@ -9,12 +9,21 @@ from PyQt5.QtWidgets import QWidget, QTreeView, QFileSystemModel, QVBoxLayout, Q
 class Tree(QTreeView):
     delete_requested = pyqtSignal(str)
 
-    def filter_rows(self):
+    def filter_rows(self, extensions=None):
+
+        extensions = extensions or [".txt", ".py", ".csv"]
+
         for i in range(self.model().rowCount(self.rootIndex())):
             child_index = self.model().index(i, 0, self.rootIndex())  # Get index of each row
             filename = self.model().data(child_index)  # Get file name
-            if filename == "__pycache__":
-                self.setRowHidden(i, self.rootIndex(), True)
+            full_path = self.model().filePath(child_index)
+            if os.path.isdir(full_path):
+                if "__pycache__" in full_path:
+                    self.setRowHidden(i, self.rootIndex(), True)
+            else:
+                extension = os.path.splitext(filename)[1]
+                if extension not in extensions:
+                    self.setRowHidden(i, self.rootIndex(), True)
 
     def contextMenuEvent(self, a0: QtGui.QContextMenuEvent) -> None:
         super().contextMenuEvent(a0)
@@ -38,14 +47,12 @@ class FileBrowser(QWidget):
     def __init__(self, path, filters=None, hide_details=True):
         super().__init__()
         self.current_files = []
-        if filters is None:
-            filters = ["*.pdf"]
         self.signals = self.Signals()
         self.path = path
         self.treeview = Tree()
         self.treeview.delete_requested.connect(self.delete_requested)
         self.dirModel = QFileSystemModel()
-        self.dirModel.directoryLoaded.connect(self.treeview.filter_rows)
+        self.dirModel.directoryLoaded.connect(lambda:self.treeview.filter_rows(filters))
         #self.dirModel.setNameFilters(filters)
         self.dirModel.setNameFilterDisables(False)
 

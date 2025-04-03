@@ -87,7 +87,7 @@ class EditorWidget(QWidget):
 
     def load_program(self, path, show_all=False):
         self.path = path
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             self.language_editor.set_code(f.read())
             self.console.clear()
 
