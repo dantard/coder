@@ -17,26 +17,24 @@ class EditorWidget(QWidget):
         self.config = config
         editor = config.root().getSubSection("editor", pretty="Editor")
         self.cfg_keep_code = editor.getCheckBox("keep_code",
-                            pretty="Keep Code on Run",
-                            default=False)
+                                                pretty="Keep Code on Run",
+                                                default=False)
         self.cfg_show_all = editor.getCheckBox("show_all",
-                            pretty="Show all Code on Open",
-                            default=False)
+                                               pretty="Show all Code on Open",
+                                               default=False)
         self.cfg_autocomplete = editor.getString("autocomplete",
-                                                  pretty="Autocomplete",
-                                                  default="")
+                                                 pretty="Autocomplete",
+                                                 default="")
         self.cfg_delay = editor.getSlider("delay",
-                                           pretty="Delay",
-                                           min=0, max=100,
-                                           default=25,
-                                           den=1,
-                                           show_value=True,
-                                           suffix=" ms")
+                                          pretty="Delay",
+                                          min=0, max=100,
+                                          default=25,
+                                          den=1,
+                                          show_value=True)
 
         self.cfg_show_sb = editor.getCheckBox("show_tb",
-                                               pretty="Show Toolbar",
-                                               default=False)
-
+                                              pretty="Show Toolbar",
+                                              default=False)
 
         self.language_editor = language_editor
         self.console = console
@@ -57,7 +55,7 @@ class EditorWidget(QWidget):
         self.keep_banner.setCheckable(True)
         self.keep_banner.setChecked(False)
 
-        self.show_all =  bar.addAction("Show all Code on Load")
+        self.show_all = bar.addAction("Show all Code on Load")
         self.show_all.setIcon(QIcon(":/icons/radio-button.svg"))
         self.show_all.setCheckable(True)
 
@@ -102,7 +100,7 @@ class EditorWidget(QWidget):
             if not filename:
                 return
 
-            self.path = filename.replace(".py","") + ".py"
+            self.path = filename.replace(".py", "") + ".py"
 
         with open(self.path, "w") as f:
             f.write(self.language_editor.toPlainText())
