@@ -3,15 +3,28 @@ import re
 
 import autopep8
 from PyQt5 import QtGui
-from PyQt5.QtCore import pyqtSignal, Qt, QTimer, QMimeData
-from PyQt5.QtGui import QFont, QFontMetrics, QColor, QPainter, QTextCursor
-from PyQt5.QtWidgets import QTextEdit, QHBoxLayout, QScrollBar, QApplication
+from PyQt5.QtCore import pyqtSignal, Qt, QTimer, QMimeData, QSize, QRect
+from PyQt5.QtGui import QFont, QFontMetrics, QColor, QPainter, QTextCursor, QTextFormat
+from PyQt5.QtWidgets import QTextEdit, QHBoxLayout, QScrollBar, QApplication, QWidget, QPlainTextEdit
 
 from spiceditor.line_number_text_edit import LineNumberTextEdit
 from spiceditor.magic_scrollbar import MagicScrollBar
 
 
-class SpiceMagicEditor(QTextEdit):
+# Claude
+class LineNumberArea(QWidget):
+    def __init__(self, editor):
+        super().__init__(editor)
+        self.editor = editor
+
+    def sizeHint(self):
+        return QSize(self.editor.line_number_area_width(), 0)
+
+    def paintEvent(self, event):
+        self.editor.line_number_area_paint_event(event)
+
+
+class SpiceMagicEditor(QPlainTextEdit):
     ctrl_enter = pyqtSignal()
     info = pyqtSignal(str, int, int)
 
@@ -26,30 +39,48 @@ class SpiceMagicEditor(QTextEdit):
         self.delay = 0.01
         self.autocomplete_words = []
 
-        self.line_number_area = LineNumberTextEdit(self)
-        self.line_number_area.verticalScrollBar().valueChanged.connect(self.verticalScrollBar().setValue)
-        self.line_number_area.document().setDocumentMargin(0)
+        # Claude
+        self.line_number_area2 = LineNumberArea(self)
+        self.blockCountChanged.connect(self.update_line_number_area_width)
+        self.updateRequest.connect(self.update_line_number_area)
+        self.cursorPositionChanged.connect(self.highlight_current_line)
+        self.update_line_number_area_width(0)
+        self.highlight_current_line()
+        ## Claude
 
         self.setContentsMargins(0, 0, 0, 0)
         self.document().setDocumentMargin(0)
         self.setViewportMargins(60, 0, 0, 0)
-        self.setLineWrapMode(QTextEdit.NoWrap)
+        #        self.setLineWrapMode(QTextEdit.NoWrap)
         self.setPlaceholderText("Write Python code here...")
 
         self.setHorizontalScrollBar(MagicScrollBar())
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
 
-        self.textChanged.connect(self.text_changed)
-        self.verticalScrollBar().valueChanged.connect(self.line_number_area.verticalScrollBar().setValue)
-        self.horizontalScrollBar().rangeChanged.connect(self.text_changed)
-
-        self.cursorPositionChanged.connect(
-            lambda: self.line_number_area.highlight_line(self.textCursor().blockNumber()))
+        #        self.textChanged.connect(self.text_changed)
+        #        self.horizontalScrollBar().rangeChanged.connect(self.text_changed)
 
         if self.highlighter:
             self.highlighter.setDocument(self.document())
 
         self.set_font_size(font_size)
+
+    def line_number_area_width(self):
+        digits = len(str(max(1, self.blockCount())))
+        space = 3 + self.fontMetrics().width('9') * digits + 20
+        return space
+
+    def update_line_number_area_width(self, _):
+        self.setViewportMargins(self.line_number_area_width(), 0, 0, 0)
+
+    def update_line_number_area(self, rect, dy):
+        if dy:
+            self.line_number_area2.scroll(0, dy)
+        else:
+            self.line_number_area2.update(0, rect.y(), self.line_number_area2.width(), rect.height())
+
+        if rect.contains(self.viewport().rect()):
+            self.update_line_number_area_width(0)
 
     def insertFromMimeData(self, source: QMimeData):
         """Override paste behavior to insert plain text only."""
@@ -61,44 +92,62 @@ class SpiceMagicEditor(QTextEdit):
         # font.setStyleHint(QFont.TypeWriter)
         font.setPixelSize(font_size)
         self.setFont(font)
-        self.line_number_area.setFont(font)
-        three_numbers_width = QFontMetrics(font).width("000")
-        self.line_number_area.setFixedWidth(int(three_numbers_width + 12))
-        self.setViewportMargins(three_numbers_width + 15, 0, 0, 0)
 
     def show_code(self):
         self.show_all_code()
 
     def set_dark_mode(self, dark):
-        self.line_number_area.set_dark_mode(dark)
+        # self.line_number_area.set_dark_mode(dark)
         self.highlighter.set_dark_mode(dark)
         self.highlighter.setDocument(self.document())
 
     def set_text(self, text):
         self.setPlainText(text)
-        self.text_changed()
-
-    def text_changed(self):
-        text = self.toPlainText()
-        lines = text.split("\n")
-        v1 = self.line_number_area.verticalScrollBar().value()
-        self.line_number_area.blockSignals(True)
-        self.line_number_area.clear()
-        text = str()
-        for i in range(len(lines)):
-            text += "{:3d}\n".format(i + 1)
-
-        self.line_number_area.setPlainText(text)
-        self.line_number_area.setFixedHeight(self.height())
-        self.line_number_area.verticalScrollBar().setMaximum(self.verticalScrollBar().maximum())
-        self.line_number_area.verticalScrollBar().setValue(v1)
-        self.line_number_area.blockSignals(False)
 
     def resizeEvent(self, a0) -> None:
-        self.text_changed()
-        self.blockSignals(True)
+        # self.text_changed()
+        # self.blockSignals(True)
         super().resizeEvent(a0)
-        self.blockSignals(False)
+        # self.blockSignals(False)
+        cr = self.contentsRect()
+
+        self.line_number_area2.setGeometry(QRect(cr.left(), cr.top(), self.line_number_area_width(), cr.height()))
+
+    def line_number_area_paint_event(self, event):
+        painter = QPainter(self.line_number_area2)
+        painter.fillRect(event.rect(), QColor(240, 240, 240))
+
+        block = self.firstVisibleBlock()
+        block_number = block.blockNumber()
+        top = round(self.blockBoundingGeometry(block).translated(self.contentOffset()).top())
+        bottom = top + round(self.blockBoundingRect(block).height())
+
+        while block.isValid() and top <= event.rect().bottom():
+            if block.isVisible() and bottom >= event.rect().top():
+                number = str(block_number + 1)
+                painter.setPen(QColor(120, 120, 120))
+                painter.setFont(self.font())
+                painter.drawText(0, top, self.line_number_area2.width() - 8,
+                                 self.fontMetrics().height(), Qt.AlignRight, number)
+
+            block = block.next()
+            top = bottom
+            bottom = top + round(self.blockBoundingRect(block).height())
+            block_number += 1
+
+    def highlight_current_line(self):
+        extra_selections = []
+
+        if not self.isReadOnly():
+            selection = QTextEdit.ExtraSelection()
+            line_color = QColor(Qt.blue).lighter(190)
+            selection.format.setBackground(line_color)
+            selection.format.setProperty(QTextFormat.FullWidthSelection, True)
+            selection.cursor = self.textCursor()
+            selection.cursor.clearSelection()
+            extra_selections.append(selection)
+
+        self.setExtraSelections(extra_selections)
 
     def format_code(self):
         self.format_code()
@@ -191,6 +240,11 @@ class SpiceMagicEditor(QTextEdit):
         self.count += 1
         self.setText(self.code[:self.count])
         self.moveCursor(QtGui.QTextCursor.End)
+
+    def setText(self, text):
+        self.blockSignals(True)
+        super().setPlainText(text)
+        self.blockSignals(False)
 
     def show_all_code(self):
         self.setText(self.code)
@@ -317,8 +371,6 @@ class SpiceMagicEditor(QTextEdit):
             self.insertPlainText(self.suggestion)
         else:
             self.insertPlainText("    ")
-
-
 
         # if len(self.candidates) > 0:
 
