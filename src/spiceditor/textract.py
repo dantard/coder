@@ -370,17 +370,29 @@ class Slides(QWidget):
         q = QShortcut("Ctrl+N", self)
         q.activated.connect(get_number_of_page)
 
-        # Set up a layout
-        layout = QHBoxLayout()
+        self.toolbar_float = None
+        self.toolbar = self.create_toolbar()
+
+
+        if self.config.root().get_child("tb_orientation").get_value() == 0:
+            layout = QHBoxLayout()
+            self.toolbar.setOrientation(Qt.Vertical)
+            alignment = Qt.AlignBottom
+        else:
+            layout = QVBoxLayout()
+            self.toolbar.setOrientation(Qt.Horizontal)
+            alignment = Qt.AlignRight
+        # reduce borders
+        self.view.setContentsMargins(0, 0, 0, 0)
+        self.toolbar.setContentsMargins(0, 0, 0, 0)
+
         layout.setSpacing(0)
         layout.addWidget(self.view)
-
+        layout.addWidget(self.toolbar)
+        layout.setAlignment(self.toolbar, alignment)
         self.setLayout(layout)
         self.update_image()
 
-        self.toolbar_float = None
-        self.toolbar = self.create_toolbar()
-        self.set_toolbar_float(True)
 
         QTimer.singleShot(0, self.resize_image)
 
@@ -394,37 +406,9 @@ class Slides(QWidget):
                     }
                 """)
 
-    def is_toolbar_float(self):
-        return self.toolbar_float
-
-    def set_toolbar_float(self, value, parent=None):
-
-        if value:
-            self.toolbar.setParent(None)
-            self.toolbar.setOrientation(Qt.Horizontal)
-            self.proxy.setWidget(self.toolbar)
-            self.proxy.setPos(-2, 10)
-            self.proxy.setZValue(1)
-            self.base.setFlags(QGraphicsItem.ItemIgnoresTransformations | QGraphicsItem.ItemIsMovable)
-            self.proxy.show()
-            self.base.show()
-            self.toolbar.show()
-
-        else:
-            self.proxy.setWidget(None)
-            self.base.hide()
-            self.toolbar.setParent(parent)
-            self.toolbar.setOrientation(Qt.Horizontal)
-            self.toolbar.show()
-
-        self.toolbar_float = value
-
     def resized(self):
         if self.base is not None:
             self.base.setPos(0, 0)
-
-    def get_toolbar(self):
-        return self.toolbar
 
     def navigate(self, delta):
         self.page = (self.page + delta) % len(self.doc)

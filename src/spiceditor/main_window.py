@@ -40,9 +40,9 @@ class MainWindow(QMainWindow):
 
         self.cfg_font_size = general.addCombobox("font_size", pretty="Font size", items=[str(i) for i in range(10, 33)],
                                                  default=0)
-        self.cfg_tb_float = general.addCombobox("tb_float",
-                                                pretty="Toolbar mode",
-                                                items=["Fixed", "Float"],
+        self.cfg_tb_orintation = general.addCombobox("tb_orientation",
+                                                pretty="Toolbar mode (relaunch needed)",
+                                                items=["Vertical", "Horizontal"],
                                                 default=0)
         hidden = self.config.root().addHidden("parameters")
         self.cfg_last = hidden.addList("last", default=[])
@@ -53,6 +53,13 @@ class MainWindow(QMainWindow):
         self.cfg_progs_path = general.addFolderChoice("progs_path",
                                                       pretty="Programs Path",
                                                       default=str(os.getcwd()))
+        self.cfg_show_all = general.getCheckBox("show_all",
+                                               pretty="Show all Code on Open",
+                                               default=False)
+
+        self.cfg_show_all = general.getCheckBox("format_code_before_run",
+                                               pretty="Format Code before Run",
+                                               default=False)
 
 
         self.dark = False
@@ -94,9 +101,10 @@ class MainWindow(QMainWindow):
         self.general_toolbar = QToolBar()
         v_layout.addWidget(self.general_toolbar)
         v_layout.addWidget(self.file_browser)
-        self.show_all_action = self.general_toolbar.addAction("Show all code")
-        self.show_all_action.setIcon(QIcon(":/icons/radio-button.svg"))
-        self.show_all_action.setCheckable(True)
+        self.show_all_code_action = self.general_toolbar.addAction("Show all code")
+        self.show_all_code_action.setIcon(QIcon(":/icons/radio-button.svg"))
+        self.show_all_code_action.setCheckable(True)
+        self.show_all_code_action.setChecked(self.cfg_show_all.get_value() or False)
 
         self.new_dir = self.general_toolbar.addAction("New Folder")
         self.new_dir.setIcon(QIcon(":/icons/folder.svg"))
@@ -199,7 +207,7 @@ class MainWindow(QMainWindow):
 
     def file_clicked(self, path):
         editor = EditorWidget(self.get_editor(), self.console_widget, self.config)
-        editor.load_program(path, self.show_all_action.isChecked())
+        editor.load_program(path, self.show_all_code_action.isChecked())
         self.editors_tabs.addTab(editor, os.path.basename(path))
         editor.set_dark_mode(self.cfg_dark.get_value() == 1)
         self.editors_tabs.setCurrentWidget(editor)
@@ -213,9 +221,10 @@ class MainWindow(QMainWindow):
     def apply_config(self):
 
         if self.slides_tabs.currentIndex() != 0:
-            self.update_toolbar_position()
-            for i in range(1, self.slides_tabs.count()):
-                self.slides_tabs.widget(i).set_toolbar_float(self.cfg_tb_float.get_value() == 1, self.slides_tabs)
+            pass
+            #self.update_toolbar_position()
+            #for i in range(1, self.slides_tabs.count()):
+            #    self.slides_tabs.widget(i).set_toolbar_float(self.cfg_tb_float.get_value() == 1, self.slides_tabs)
 
         for i in range(self.editors_tabs.count()):
             editor = self.editors_tabs.widget(i)
@@ -312,36 +321,19 @@ class MainWindow(QMainWindow):
 
     def resizeEvent(self, a0):
         super().resizeEvent(a0)
-        self.update_toolbar_position()
-
-    def update_toolbar_position(self):
-        if self.slides_tabs.currentIndex() == 0:
-            return
-
-        widget = self.slides_tabs.currentWidget()
-
-        if not widget.is_toolbar_float():
-            toolbar = widget.get_toolbar()
-            toolbar.setParent(self.slides_tabs)
-            toolbar.show()
-
-            if self.isFullScreen():
-                toolbar.setGeometry(self.width() - toolbar.sizeHint().width() - 20, self.height() - 34,
-                                    toolbar.sizeHint().width(), 40)
-            else:
-                toolbar.setGeometry(self.width() - toolbar.sizeHint().width() - 20, self.height() - 56,
-                                    toolbar.sizeHint().width(), 40)
+        #self.update_toolbar_position()
 
     def tab_changed(self, index):
-        for i in range(1, self.slides_tabs.count()):
-            widget = self.slides_tabs.widget(i)
-            if not widget.is_toolbar_float():
-                widget.toolbar.hide()
+        pass
+        # for i in range(1, self.slides_tabs.count()):
+        #     widget = self.slides_tabs.widget(i)
+        #     if not widget.is_toolbar_float():
+        #         widget.toolbar.hide()
 
         if index == 0:
             self.apply_color_scheme(self.cfg_dark.get_value() == 1)
         else:
-            self.update_toolbar_position()
+            #self.update_toolbar_position()
             self.setStyleSheet("")
 
     def set_touchable(self):
@@ -362,7 +354,6 @@ class MainWindow(QMainWindow):
             name = filename.split(os.sep)[-1].replace(".pdf", "")
             if os.path.exists(filename):
                 slides = Slides(self.config, filename, page)
-                slides.set_toolbar_float(self.cfg_tb_float.get_value() == 1, self.slides_tabs)
                 slides.play_code.connect(self.code_from_slide)
                 self.slides_tabs.addTab(slides, name)
                 self.slides_tabs.setCurrentWidget(slides)

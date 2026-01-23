@@ -30,6 +30,10 @@ class SpiceMagicEditor(QPlainTextEdit):
 
     def __init__(self, highlighter=None, font_size=18):
         super().__init__()
+        self.line_number_area_text_color = QColor(120, 120, 120)
+        self.line_number_area_color = QColor(240, 240, 240)
+        self.line_color = QColor(Qt.blue).lighter(190)
+
         self.highlighter = highlighter
         self.suggestion = None
         self.candidates = []
@@ -98,6 +102,15 @@ class SpiceMagicEditor(QPlainTextEdit):
 
     def set_dark_mode(self, dark):
         # self.line_number_area.set_dark_mode(dark)
+        if dark:
+            self.line_number_area_color = QColor(30, 30, 30)
+            self.line_number_area_text_color = QColor(200, 200, 200)
+            self.line_color = QColor(50, 50, 100)
+        else:
+            self.line_number_area_color = QColor(240, 240, 240)
+            self.line_number_area_text_color = QColor(120, 120, 120)
+            self.line_color = QColor(Qt.blue).lighter(190)
+
         self.highlighter.set_dark_mode(dark)
         self.highlighter.setDocument(self.document())
 
@@ -115,7 +128,7 @@ class SpiceMagicEditor(QPlainTextEdit):
 
     def line_number_area_paint_event(self, event):
         painter = QPainter(self.line_number_area2)
-        painter.fillRect(event.rect(), QColor(240, 240, 240))
+        painter.fillRect(event.rect(), self.line_number_area_color)
 
         block = self.firstVisibleBlock()
         block_number = block.blockNumber()
@@ -125,7 +138,7 @@ class SpiceMagicEditor(QPlainTextEdit):
         while block.isValid() and top <= event.rect().bottom():
             if block.isVisible() and bottom >= event.rect().top():
                 number = str(block_number + 1)
-                painter.setPen(QColor(120, 120, 120))
+                painter.setPen(self.line_number_area_text_color)
                 painter.setFont(self.font())
                 painter.drawText(0, top, self.line_number_area2.width() - 8,
                                  self.fontMetrics().height(), Qt.AlignRight, number)
@@ -140,7 +153,7 @@ class SpiceMagicEditor(QPlainTextEdit):
 
         if not self.isReadOnly():
             selection = QTextEdit.ExtraSelection()
-            line_color = QColor(Qt.blue).lighter(190)
+            line_color = self.line_color
             selection.format.setBackground(line_color)
             selection.format.setProperty(QTextFormat.FullWidthSelection, True)
             selection.cursor = self.textCursor()

@@ -4,6 +4,8 @@ import re
 from io import BytesIO
 
 from PyPDF2 import PdfReader, PdfWriter
+from reportlab.lib.colors import Color, white
+from reportlab.pdfgen import canvas
 
 
 def add_text_to_page(page, text, position, page_size):

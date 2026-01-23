@@ -19,9 +19,6 @@ class EditorWidget(QWidget):
         self.cfg_keep_code = editor.getCheckBox("keep_code",
                                                 pretty="Keep Code on Run",
                                                 default=False)
-        self.cfg_show_all = editor.getCheckBox("show_all",
-                                               pretty="Show all Code on Open",
-                                               default=False)
         self.cfg_autocomplete = editor.getString("autocomplete",
                                                  pretty="Autocomplete",
                                                  default="")
@@ -55,9 +52,9 @@ class EditorWidget(QWidget):
         self.keep_banner.setCheckable(True)
         self.keep_banner.setChecked(False)
 
-        self.show_all = bar.addAction("Show all Code on Load")
-        self.show_all.setIcon(QIcon(":/icons/radio-button.svg"))
-        self.show_all.setCheckable(True)
+        # self.show_all = bar.addAction("Show all Code on Load")
+        # self.show_all.setIcon(QIcon(":/icons/radio-button.svg"))
+        # self.show_all.setCheckable(True)
 
         self.text_edit_group = [a1, a2, a3, self.keep_banner]
         bar.addSeparator()
@@ -72,9 +69,12 @@ class EditorWidget(QWidget):
         self.setLayout(left_layout)
         self.setLayout(left_layout)
 
+        q = QShortcut("F5", self)
+        q.activated.connect(self.language_editor.format_code)
+
     def update_config(self):
         self.keep_banner.setChecked(self.cfg_keep_code.get())
-        self.show_all.setChecked(self.cfg_show_all.get())
+        #self.show_all.setChecked(self.cfg_show_all.get())
         self.language_editor.append_autocomplete(self.cfg_autocomplete.get())
         self.language_editor.set_delay(self.cfg_delay.get())
         self.language_editor.set_font_size(self.config.root().get_node("font_size").get() + 10)
@@ -89,7 +89,7 @@ class EditorWidget(QWidget):
             self.language_editor.set_code(f.read())
             self.console.clear()
 
-        if self.show_all.isChecked() or show_all:
+        if show_all:
             self.show_all_code()
 
     def save_program(self, path, save_as):
@@ -116,7 +116,9 @@ class EditorWidget(QWidget):
         # self.console_widget.clear()
 
     def execute_code(self):
-        self.language_editor.format_code()
+        if self.config.root().get_child("format_code_before_run").get_value():
+            self.language_editor.format_code()
+
         self.console.execute(self.language_editor.toPlainText(), not self.keep_banner.isChecked())
 
     def set_dark_mode(self, dark):
