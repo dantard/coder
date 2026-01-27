@@ -309,7 +309,7 @@ class MainWindow(QMainWindow):
 
     def keyPressEvent(self, a0):
         if a0.key() == Qt.Key_F11:
-            self.toggle_fullscreen()
+            self.editors_tabs.currentWidget().execute_code()
         elif Qt.Key_F1 <= a0.key() <= Qt.Key_F10:
             idx = a0.key() - Qt.Key_F1
 

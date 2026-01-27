@@ -182,7 +182,7 @@ padding: 4px 10px;
 </tr>
 
 <tr>
-    <td>Toggle Fullscreen</td>
+    <td>Execute whole code</td>
     <td>F11</td>
 </tr>
 <tr>
