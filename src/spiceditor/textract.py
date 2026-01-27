@@ -355,10 +355,10 @@ class Slides(QWidget):
         self.view.setAlignment(Qt.AlignCenter)
         self.view.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
 
-        self.base = QGraphicsRectItem(0, 0, 35, 15, self.scene.pixmap)
-        self.base.setBrush(QColor(220, 220, 220))
-        self.base.setPen(Qt.transparent)
-        self.proxy = QGraphicsProxyWidget(self.base)
+        # self.base = QGraphicsRectItem(0, 0, 35, 15, self.scene.pixmap)
+        # self.base.setBrush(QColor(0, 220, 220))
+        # self.base.setPen(Qt.transparent)
+        # self.proxy = QGraphicsProxyWidget(self.base)
 
         # add shortcut ctrl+n to number of page
         def get_number_of_page():

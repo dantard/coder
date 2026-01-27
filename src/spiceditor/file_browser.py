@@ -1,5 +1,7 @@
 import os
 import shutil
+import subprocess
+import sys
 
 from PyQt5 import QtGui
 from PyQt5.QtCore import QObject, pyqtSignal, QDir, QItemSelectionModel, QModelIndex, Qt, QTimer
@@ -92,7 +94,18 @@ class FileBrowser(QWidget):
         path = self.dirModel.fileInfo(index).absoluteFilePath()
         if os.path.isdir(path):
             return
-        self.signals.file_selected.emit(path)
+        if os.path.isfile(path):
+            extension = os.path.splitext(path)[1]
+            if extension in [".txt", ".py", ".csv", ".yaml", ".json"]:
+                self.signals.file_selected.emit(path)
+            else:
+                # open with default application
+                if sys.platform.startswith("win"):
+                    os.startfile(path)
+                elif sys.platform.startswith("darwin"):
+                    subprocess.run(["open", path], check=False)
+                else:
+                    subprocess.run(["xdg-open", path], check=False)
 
     def btn_up_clicked(self):
         index = self.treeview.rootIndex()

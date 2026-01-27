@@ -292,10 +292,12 @@ class MainWindow(QMainWindow):
             self.setStyleSheet("background-color: #000000; color: white" if dark else "")
 
     def toggle_focus(self):
-        if self.language_editor.hasFocus():
-            self.console_widget._control.setFocus()
+        if self.editors_tabs.currentWidget().language_editor.hasFocus():
+            self.console_widget: JupyterConsole
+            self.console_widget.set_editor_focus()
         else:
-            self.language_editor.setFocus()
+            editor: EditorWidget = self.editors_tabs.currentWidget()
+            editor.language_editor.setFocus()
 
     def set_writing_mode(self, mode):
         for i, elem in enumerate(self.group):
@@ -313,6 +315,10 @@ class MainWindow(QMainWindow):
 
             if idx < self.slides_tabs.count():
                 self.slides_tabs.setCurrentIndex(idx)
+        elif a0.key() == Qt.Key_F12:
+            self.editors_tabs.currentWidget().execute_single_line(True)
+        if a0.key() == Qt.Key_F1:
+            self.toggle_focus()
 
         super().keyPressEvent(a0)
 

@@ -1,9 +1,11 @@
 import os
 
 from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QFont, QIcon
+from PyQt5.QtGui import QFont, QIcon, QTextCursor
 from PyQt5.QtWidgets import QVBoxLayout, QToolBar, QStatusBar, QWidget, QComboBox, QShortcut, QTabWidget, QFileDialog, \
     QApplication, QDialog, QMessageBox
+
+from progs.meta import PythonEditor
 from spiceditor import utils
 
 import spiceditor.resources  # noqa
@@ -40,6 +42,7 @@ class EditorWidget(QWidget):
         left_layout = QVBoxLayout()
 
         self.language_editor.ctrl_enter.connect(self.execute_code)
+        self.language_editor.ctrl_shift_enter.connect(self.execute_single_line)
         self.language_editor.info.connect(self.update_status_bar)
 
         bar = QToolBar()
@@ -120,6 +123,12 @@ class EditorWidget(QWidget):
             self.language_editor.format_code()
 
         self.console.execute(self.language_editor.toPlainText(), not self.keep_banner.isChecked())
+
+    def execute_single_line(self, advance=False):
+        line = self.language_editor.get_current_line()
+        self.console.execute(line, not self.keep_banner.isChecked())
+        if advance:
+            self.language_editor.moveCursor(QTextCursor.Down)
 
     def set_dark_mode(self, dark):
         self.language_editor.set_dark_mode(dark)

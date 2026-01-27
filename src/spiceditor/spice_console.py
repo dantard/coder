@@ -46,6 +46,9 @@ class SpiceConsole(QWidget):
     def update_config(self, **kwargs):
         pass
 
+    def set_editor_focus(self):
+        pass
+
 
 class JupyterConsole(SpiceConsole):
 
@@ -83,6 +86,9 @@ class JupyterConsole(SpiceConsole):
         self.timer = QTimer()
         self.timer.setSingleShot(True)
         self.timer.timeout.connect(self.done.emit)
+
+    def set_editor_focus(self):
+        self.jupyter_widget._control.setFocus()
 
     def config_read(self):
         pass

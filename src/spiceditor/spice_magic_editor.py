@@ -26,6 +26,7 @@ class LineNumberArea(QWidget):
 
 class SpiceMagicEditor(QPlainTextEdit):
     ctrl_enter = pyqtSignal()
+    ctrl_shift_enter = pyqtSignal()
     info = pyqtSignal(str, int, int)
 
     def __init__(self, highlighter=None, font_size=18):
@@ -324,6 +325,8 @@ class SpiceMagicEditor(QPlainTextEdit):
                 self.suggestion = None
                 if e.modifiers() == Qt.ControlModifier:
                     self.ctrl_enter.emit()
+                elif e.modifiers() == (Qt.ControlModifier | Qt.ShiftModifier):
+                    self.ctrl_shift_enter.emit()
                 elif self.on_return_key(e):
                     pass
                 else:
@@ -375,12 +378,16 @@ class SpiceMagicEditor(QPlainTextEdit):
                     self.candidates.append(words_before_cursos[-1])
                 self.suggestion = words_before_cursos[-1]
 
+        print("CANDIDATES:", self.candidates)
         if len(self.candidates) > 1:
+
             # Remove the current suggestion
             for _ in range(len(self.suggestion)):
                 self.textCursor().deletePreviousChar()
-            self.candidates.append(self.suggestion)
+
             self.suggestion = self.candidates.pop(0)
+            self.candidates.append(self.suggestion)
+            print("Suggestion:", self.suggestion)
             self.insertPlainText(self.suggestion)
         else:
             self.insertPlainText("    ")

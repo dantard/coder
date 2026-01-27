@@ -2,28 +2,37 @@ from PyQt5.QtCore import Qt, QRegExp
 from PyQt5.QtGui import QSyntaxHighlighter, QTextCharFormat, QColor, QFont
 
 
+class Scheme:
+    def __init__(self, keywords, color1, color2):
+        self.keywords = keywords
+        self.color_light = color1
+        self.color_dark = color2
+
 class SyntaxHighlighter(QSyntaxHighlighter):
 
-    def __init__(self, keywords):
+
+
+    def __init__(self, *schemes):
         super().__init__(None)
         self.highlighting_rules = []
-        self.keywords = keywords
+        self.schemes = schemes
         self.dark = False
-        self.apply_scheme()
+        self.keywords = []
+        self.apply_schemes()
 
     def set_dark_mode(self, dark):
         self.dark = dark
-
         self.highlighting_rules.clear()
-        self.apply_scheme()
+        self.apply_schemes()
 
-    def apply_scheme(self):
-        for keywords, color1, color2 in self.keywords:
+    def apply_schemes(self):
+        for scheme in self.schemes: # Scheme
             keyword_format = QTextCharFormat()
-            keyword_format.setForeground(color1 if not self.dark else color2)
+            keyword_format.setForeground(scheme.color_light if not self.dark else scheme.color_dark)
             keyword_format.setFontWeight(QFont.Bold)
 
-            self.highlighting_rules += [(f"\\b{k}\\b", keyword_format) for k in keywords]
+            self.highlighting_rules += [(f"\\b{k}\\b", keyword_format) for k in scheme.keywords]
+            self.keywords += scheme.keywords
 
         string_format = QTextCharFormat()
         string_format.setForeground(Qt.magenta)
@@ -34,6 +43,7 @@ class SyntaxHighlighter(QSyntaxHighlighter):
         comment_format.setForeground(QColor("green"))
         comment_format.setFontItalic(True)
         self.highlighting_rules.append((r"#.*", comment_format))
+
 
     def highlightBlock(self, text):
         for pattern, fmt in self.highlighting_rules:
@@ -50,16 +60,14 @@ class SyntaxHighlighter(QSyntaxHighlighter):
 
 class PythonHighlighter(SyntaxHighlighter):
     def __init__(self, dark=False):
-        super().__init__([
-            (['return', 'nonlocal', 'elif', 'assert', 'or', 'yield', 'finally',
-              'from', 'global', 'del', 'print', 'None', 'pass', 'class', 'as',
-              'break', 'while', 'await', 'async', 'range', 'is', 'True', 'lambda',
-              'False', 'in', 'import', 'except', 'continue', 'and', 'raise', 'with',
-              'if', 'try', 'for', 'else', 'not', 'def', "input", "int", "float", "str",
-              "list", "dict", "input", "print", "open", "read", "write", "close", "split",
-              ], Qt.blue, Qt.cyan),
-            (["self"], Qt.darkCyan, Qt.darkCyan)
-        ])
+        super().__init__(
+            Scheme(['return', 'nonlocal', 'elif', 'assert', 'or', 'yield', 'finally',
+                                          'from', 'global', 'del', 'print', 'None', 'pass', 'class', 'as',
+                                          'break', 'while', 'await', 'async', 'range', 'is', 'True', 'lambda',
+                                          'False', 'in', 'import', 'except', 'continue', 'and', 'raise', 'with',
+                                          'if', 'try', 'for', 'else', 'not', 'def', "input", "int", "float", "str",
+                                          "list", "dict", "input", "print", "open", "read", "write", "close", "split",], Qt.blue, Qt.cyan),
+                    Scheme(['self'], Qt.darkMagenta, Qt.magenta))
 
 
 class PascalHighlighter(SyntaxHighlighter):
