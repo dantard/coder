@@ -5,7 +5,6 @@ from PyQt5.QtGui import QFont, QIcon, QTextCursor
 from PyQt5.QtWidgets import QVBoxLayout, QToolBar, QStatusBar, QWidget, QComboBox, QShortcut, QTabWidget, QFileDialog, \
     QApplication, QDialog, QMessageBox
 
-from progs.meta import PythonEditor
 from spiceditor import utils
 
 import spiceditor.resources  # noqa
@@ -77,7 +76,7 @@ class EditorWidget(QWidget):
 
     def update_config(self):
         self.keep_banner.setChecked(self.cfg_keep_code.get())
-        #self.show_all.setChecked(self.cfg_show_all.get())
+        # self.show_all.setChecked(self.cfg_show_all.get())
         self.language_editor.append_autocomplete(self.cfg_autocomplete.get())
         self.language_editor.set_delay(self.cfg_delay.get())
         self.language_editor.set_font_size(self.config.root().get_node("font_size").get() + 10)

@@ -6,8 +6,10 @@ from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import QApplication, QMainWindow, QSplitter, QPushButton, QVBoxLayout, QWidget, \
     QTabWidget, QFileDialog, QShortcut, QTabBar, QMessageBox, QToolBar
 from easyconfig2.easyconfig import EasyConfig2 as EasyConfig
+from sympy.physics.units import minutes
 
 import spiceditor.resources  # noqa
+from spiceditor.bw_timer import CountdownTimer
 from spiceditor.dialogs import Author
 from spiceditor.editor_widget import EditorWidget
 from spiceditor.file_browser import FileBrowser
@@ -41,9 +43,9 @@ class MainWindow(QMainWindow):
         self.cfg_font_size = general.addCombobox("font_size", pretty="Font size", items=[str(i) for i in range(10, 33)],
                                                  default=0)
         self.cfg_tb_orintation = general.addCombobox("tb_orientation",
-                                                pretty="Toolbar mode (relaunch needed)",
-                                                items=["Vertical", "Horizontal"],
-                                                default=0)
+                                                     pretty="Toolbar mode (relaunch needed)",
+                                                     items=["Vertical", "Horizontal"],
+                                                     default=0)
         hidden = self.config.root().addHidden("parameters")
         self.cfg_last = hidden.addList("last", default=[])
 
@@ -54,15 +56,15 @@ class MainWindow(QMainWindow):
                                                       pretty="Programs Path",
                                                       default=str(os.getcwd()))
         self.cfg_show_all = general.getCheckBox("show_all",
-                                               pretty="Show all Code on Open",
-                                               default=False)
+                                                pretty="Show all Code on Open",
+                                                default=False)
 
         self.cfg_show_all = general.getCheckBox("format_code_before_run",
-                                               pretty="Format Code before Run",
-                                               default=False)
-
+                                                pretty="Format Code before Run",
+                                                default=False)
 
         self.dark = False
+        self.timers = []
 
         # SPICE – Slides, Python, Interactive Creation, and Education
         # slides and python for interactive and creative education
@@ -77,7 +79,6 @@ class MainWindow(QMainWindow):
 
         self.base_editor = EditorWidget(self.get_editor(), self.console_widget, self.config)
 
-
         self.config.load("spiceditor.yaml")
         self.console_widget.config_read()
 
@@ -91,7 +92,7 @@ class MainWindow(QMainWindow):
         helper.setLayout(QVBoxLayout())
         helper.layout().addWidget(self.editors_tabs)
 
-        self.file_browser = FileBrowser(self.cfg_progs_path.get_value(), filters=[".py", ".csv", ".txt", ".yaml"],)
+        self.file_browser = FileBrowser(self.cfg_progs_path.get_value(), filters=[".py", ".csv", ".txt", ".yaml"], )
         self.file_browser.signals.file_selected.connect(self.file_clicked)
         self.splitter = QSplitter(Qt.Horizontal)
 
@@ -128,6 +129,11 @@ class MainWindow(QMainWindow):
         m1 = file.addMenu("Slides")
         file.addSeparator()
         file.addAction("Exit", self.close)
+        m4 = menu.addMenu("Timer")
+        m4.addAction("5 min", lambda: self.create_timer(minutes=5))
+        m4.addAction("10 min", lambda: self.create_timer(minutes=10))
+        m4.addAction("15 min", lambda: self.create_timer(minutes=15))
+
         m3 = menu.addMenu("Edit")
         m3.addAction("Preferences", self.edit_config)
         m2 = menu.addMenu("Help")
@@ -162,11 +168,10 @@ class MainWindow(QMainWindow):
         q.activated.connect(self.save_requested)
 
         q = QShortcut("Ctrl+Shift+S", self)
-        q.activated.connect(lambda : self.save_as_requested())
+        q.activated.connect(lambda: self.save_as_requested())
 
         q = QShortcut("Ctrl+K", self)
         q.activated.connect(self.show_only)
-
 
         for elem in self.cfg_last.get_value():
             self.open_slides(elem.get("filename"), elem.get("page", 0))
@@ -184,6 +189,16 @@ class MainWindow(QMainWindow):
 
         QTimer.singleShot(10, self.finish_config)
 
+    def create_timer(self, hours=0, minutes=0, seconds=0):
+        total_seconds = hours * 3600 + minutes * 60 + seconds
+        if total_seconds <= 0:
+            return
+
+        timer_widget = CountdownTimer(hours=hours, minutes=minutes, seconds=seconds, auto_start=True, show_buttons=True)
+        timer_widget.setWindowTitle('Countdown Timer')
+        timer_widget.resize(300, 150)
+        timer_widget.show()
+        self.timers.append(timer_widget)
 
     def show_only(self):
         if self.show_iter == 0:
@@ -197,13 +212,11 @@ class MainWindow(QMainWindow):
         else:
             self.splitter.setSizes(self.sizes)
 
-
     def save_requested(self):
         self.editors_tabs.currentWidget().save_program(self.cfg_progs_path.get_value(), False)
 
     def save_as_requested(self):
         self.editors_tabs.currentWidget().save_program(self.cfg_progs_path.get_value(), True)
-
 
     def file_clicked(self, path):
         editor = EditorWidget(self.get_editor(), self.console_widget, self.config)
@@ -222,8 +235,8 @@ class MainWindow(QMainWindow):
 
         if self.slides_tabs.currentIndex() != 0:
             pass
-            #self.update_toolbar_position()
-            #for i in range(1, self.slides_tabs.count()):
+            # self.update_toolbar_position()
+            # for i in range(1, self.slides_tabs.count()):
             #    self.slides_tabs.widget(i).set_toolbar_float(self.cfg_tb_float.get_value() == 1, self.slides_tabs)
 
         for i in range(self.editors_tabs.count()):
@@ -327,7 +340,7 @@ class MainWindow(QMainWindow):
 
     def resizeEvent(self, a0):
         super().resizeEvent(a0)
-        #self.update_toolbar_position()
+        # self.update_toolbar_position()
 
     def tab_changed(self, index):
         pass
@@ -339,7 +352,7 @@ class MainWindow(QMainWindow):
         if index == 0:
             self.apply_color_scheme(self.cfg_dark.get_value() == 1)
         else:
-            #self.update_toolbar_position()
+            # self.update_toolbar_position()
             self.setStyleSheet("")
 
     def set_touchable(self):
@@ -396,6 +409,3 @@ class MainWindow(QMainWindow):
         editor.language_editor.setFocus()
         self.slides_tabs.setCurrentIndex(0)
         editor.show_all_code()
-
-
-
