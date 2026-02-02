@@ -62,6 +62,7 @@ class MainWindow(QMainWindow):
         self.cfg_show_all = general.getCheckBox("format_code_before_run",
                                                 pretty="Format Code before Run",
                                                 default=False)
+        self.cfg_click_to_next = general.addCombobox("click_to_next", pretty="Click to go to next slide", items=["1","2","3"], default=0)
 
         self.dark = False
         self.timers = []
@@ -371,6 +372,9 @@ class MainWindow(QMainWindow):
 
         if filename:
             name = filename.split(os.sep)[-1].replace(".pdf", "")
+
+            name = name[0:12] + "..." + name[-12:] if len(name) > 27 else name
+
             if os.path.exists(filename):
                 slides = Slides(self.config, filename, page)
                 slides.play_code.connect(self.code_from_slide)

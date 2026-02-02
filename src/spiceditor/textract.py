@@ -1,6 +1,7 @@
 import os
 import platform
 import subprocess
+import time
 
 import fitz  # PyMuPDF
 import sys
@@ -330,6 +331,8 @@ class Slides(QWidget):
 
     def __init__(self, config, pdf_path, page):
         super().__init__()
+        self.clicks = 0
+        self.last_click = 0
         self.config = config
         self.thickness = 2
         self.action_touchable = None
@@ -446,8 +449,15 @@ class Slides(QWidget):
             return
 
         if not self.action_touchable.isChecked():
-            right_side = a0.x() > self.view.width() // 2
-            self.move_to(right_side)
+            if time.time() - self.last_click < 0.4:
+                self.clicks +=1
+            else:
+                self.clicks = 0
+            self.last_click = time.time()
+
+            if self.clicks > self.config.root().get_child("click_to_next").get_value()-1:
+                right_side = a0.x() > self.view.width() // 2
+                self.move_to(right_side)
 
     def move_to(self, right_side):
         if right_side:
