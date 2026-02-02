@@ -12,7 +12,8 @@ setup(
         'scipy',
         'qtconsole',
         'termqt',
-        'easyconfig2'
+        'easyconfig2',
+        'pyshortcuts'
     ],
     author='Danilo Tardioli',
     author_email='dantard@unizar.es',
@@ -30,6 +31,7 @@ setup(
         'console_scripts': [
             'spice=spiceditor.spice:main',
             'spiceterm=spiceditor.spiceterm:main',
+            'spiceinstall=spiceditor.install:create_shortcuts'
         ],
     }
 )
