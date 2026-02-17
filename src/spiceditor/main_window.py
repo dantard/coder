@@ -40,7 +40,7 @@ class MainWindow(QMainWindow):
                                                        pretty="Open Fullscreen",
                                                        default=False)
 
-        self.cfg_font_size = general.addCombobox("font_size", pretty="Font size", items=[str(i) for i in range(10, 33)],
+        self.cfg_font_size = general.addCombobox("font_size", pretty="Font size", items=[str(i) for i in range(10, 65)],
                                                  default=0)
         self.cfg_tb_orintation = general.addCombobox("tb_orientation",
                                                      pretty="Toolbar mode (relaunch needed)",
@@ -62,7 +62,8 @@ class MainWindow(QMainWindow):
         self.cfg_show_all = general.getCheckBox("format_code_before_run",
                                                 pretty="Format Code before Run",
                                                 default=False)
-        self.cfg_click_to_next = general.addCombobox("click_to_next", pretty="Click to go to next slide", items=["1","2","3"], default=0)
+        self.cfg_click_to_next = general.addCombobox("click_to_next", pretty="Click to go to next slide",
+                                                     items=["1", "2", "3"], default=0)
 
         self.dark = False
         self.timers = []
@@ -251,7 +252,7 @@ class MainWindow(QMainWindow):
 
         current_font_size = self.editors_tabs.currentWidget().get_font_size()
         goal = current_font_size + delta
-        if goal < 10 or goal > 32:
+        if goal < 10 or goal > 64:
             return
         for i in range(self.editors_tabs.count()):
             self.editors_tabs.widget(i).set_font_size(goal)
