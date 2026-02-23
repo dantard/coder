@@ -173,3 +173,6 @@ class EditorWidget(QWidget):
                 self.sb.setStyleSheet("color: red")
             else:
                 self.sb.setStyleSheet("color: black")
+
+    def get_editor(self):
+        return self.language_editor

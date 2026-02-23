@@ -4,19 +4,22 @@ import sys
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import QApplication, QMainWindow, QSplitter, QPushButton, QVBoxLayout, QWidget, \
-    QTabWidget, QFileDialog, QShortcut, QTabBar, QMessageBox, QToolBar
+    QTabWidget, QFileDialog, QShortcut, QTabBar, QMessageBox, QToolBar, QDialog
 from easyconfig2.easyconfig import EasyConfig2 as EasyConfig
+from future.backports.socket import socket
 from sympy.physics.units import minutes
+from tbcontrol.fopdtitae import parameters
 
 import spiceditor.resources  # noqa
 from spiceditor.bw_timer import CountdownTimer
-from spiceditor.dialogs import Author
+from spiceditor.dialogs import Author, ConnectionDialog
 from spiceditor.editor_widget import EditorWidget
 from spiceditor.file_browser import FileBrowser
 from spiceditor.highlighter import PythonHighlighter, PascalHighlighter
 from spiceditor.spice_magic_editor import PythonEditor, PascalEditor
 from spiceditor.spice_console import JupyterConsole, TermQtConsole
 from spiceditor.textract import Slides
+import argparse
 
 
 class CustomTabBar(QTabBar):
@@ -31,6 +34,14 @@ class MainWindow(QMainWindow):
 
     def __init__(self, console):
         super().__init__()
+
+        parser = argparse.ArgumentParser()
+        parser.add_argument("--userid", type=str, help="User ID for collaborative editing", default=None)
+        parser.add_argument("--host", action="store_true", help="Start in host mode for collaborative editing")
+        args = parser.parse_args()
+
+        self.userid = args.userid
+
         self.show_iter = 0
         self.sizes = None
         self.config = EasyConfig(immediate=True)
@@ -80,6 +91,8 @@ class MainWindow(QMainWindow):
         self.console_widget = console(self.config)
 
         self.base_editor = EditorWidget(self.get_editor(), self.console_widget, self.config)
+        if args.host:
+            self.base_editor.get_editor().start_server(args.userid if args.userid else "host")
 
         self.config.load("spiceditor.yaml")
         self.console_widget.config_read()
@@ -130,6 +143,7 @@ class MainWindow(QMainWindow):
         file.addAction("Open", self.open_slides)
         m1 = file.addMenu("Slides")
         file.addSeparator()
+        file.addAction("Connect", self.connect_to_host)
         file.addAction("Exit", self.close)
         m4 = menu.addMenu("Timer")
         m4.addAction("5 min", lambda: self.create_timer(minutes=5))
@@ -190,6 +204,20 @@ class MainWindow(QMainWindow):
         self.cfg_dark.value_changed.connect(lambda x: self.apply_color_scheme(x.get()))
 
         QTimer.singleShot(10, self.finish_config)
+
+    def connect_to_host(self):
+        dialog = ConnectionDialog(self.userid if self.userid else "User", self)
+        if dialog.exec_() == QDialog.Accepted:
+            values = dialog.get_values()
+            host = values.get("host_address")
+            port = values.get("host_port")
+            user_id = values.get("user_id")
+            sock = self.base_editor.get_editor().connect_to_host(user_id, host=host, port=int(port))
+            sock.connected.connect(
+                lambda: QMessageBox.information(self, "Connected",
+                                                f"Successfully connected to {host}:{port} as user '{user_id}'"))
+            sock.errorOccurred.connect(
+                lambda: QMessageBox.critical(self, "Connection Error", f"Failed to connect to {host}:{port}"))
 
     def create_timer(self, hours=0, minutes=0, seconds=0):
         total_seconds = hours * 3600 + minutes * 60 + seconds
@@ -265,10 +293,10 @@ class MainWindow(QMainWindow):
         self.console_widget.set_font_size(x)
 
     def get_editor(self):
-        if len(sys.argv) == 2:
-            editor = PascalEditor()
-        else:
-            editor = PythonEditor(PythonHighlighter())
+        # if len(sys.argv) == 2:
+        #     editor = PascalEditor()
+        # else:
+        editor = PythonEditor(PythonHighlighter())
         return editor
 
     def remove_editor_tab(self, index):

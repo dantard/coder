@@ -1,6 +1,12 @@
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QPushButton, QTextEdit, QVBoxLayout, QDialog, QTabWidget, QWidget
 
+import sys
+from PyQt5.QtWidgets import (
+    QApplication, QDialog, QDialogButtonBox,
+    QFormLayout, QLineEdit, QVBoxLayout
+)
+
 
 class Author(QDialog):
     def __init__(self):
@@ -213,7 +219,6 @@ padding: 4px 10px;
 </html>
         """)
 
-
         self.tabs.addTab(textEdit, "About")
         self.tabs.addTab(textEdit2, "Shortcuts")
         close_button = QPushButton("Close")
@@ -222,3 +227,37 @@ padding: 4px 10px;
         self.layout().addWidget(close_button)
         self.layout().setAlignment(close_button, Qt.AlignRight)
         close_button.clicked.connect(self.close)
+
+
+class ConnectionDialog(QDialog):
+    def __init__(self, userid, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Connection Settings")
+
+        # Fields
+        self.user_id_edit = QLineEdit(userid)
+        self.host_address_edit = QLineEdit("127.0.0.1")
+        self.host_port_edit = QLineEdit("12345")
+
+        # Form layout
+        form = QFormLayout()
+        form.addRow("User ID:", self.user_id_edit)
+        form.addRow("Host Address:", self.host_address_edit)
+        form.addRow("Host Port:", self.host_port_edit)
+
+        # OK / Cancel buttons
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+
+        # Main layout
+        layout = QVBoxLayout(self)
+        layout.addLayout(form)
+        layout.addWidget(buttons)
+
+    def get_values(self):
+        return {
+            "user_id": self.user_id_edit.text(),
+            "host_address": self.host_address_edit.text(),
+            "host_port": self.host_port_edit.text(),
+        }

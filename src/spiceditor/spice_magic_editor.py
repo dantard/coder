@@ -10,6 +10,8 @@ from PyQt5.QtWidgets import QTextEdit, QHBoxLayout, QScrollBar, QApplication, QW
 from spiceditor.line_number_text_edit import LineNumberTextEdit
 from spiceditor.magic_scrollbar import MagicScrollBar
 
+from spiceditor.ColabTextEditors import CollabPlainTextEdit
+
 
 # Claude
 class LineNumberArea(QWidget):
@@ -24,7 +26,7 @@ class LineNumberArea(QWidget):
         self.editor.line_number_area_paint_event(event)
 
 
-class SpiceMagicEditor(QPlainTextEdit):
+class SpiceMagicEditor(CollabPlainTextEdit):
     ctrl_enter = pyqtSignal()
     ctrl_shift_enter = pyqtSignal()
     info = pyqtSignal(str, int, int)
@@ -34,7 +36,6 @@ class SpiceMagicEditor(QPlainTextEdit):
         self.line_number_area_text_color = QColor(120, 120, 120)
         self.line_number_area_color = QColor(240, 240, 240)
         self.line_color = QColor(Qt.blue).lighter(190)
-
         self.highlighter = highlighter
         self.suggestion = None
         self.candidates = []
