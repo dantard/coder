@@ -266,6 +266,13 @@ class SpiceMagicEditor(CollabPlainTextEdit):
         self.set_mode(0)
         self.moveCursor(QtGui.QTextCursor.End)
 
+    def is_at_line_end(self):
+        cursor = self.textCursor()
+        # Move a copy to end of line and compare positions
+        cursor_at_end = self.textCursor()
+        cursor_at_end.movePosition(cursor_at_end.EndOfLine)
+        return cursor.position() == cursor_at_end.position()
+
     def get_current_line_text(self):
         # Get the QTextCursor
         cursor = self.textCursor()
@@ -317,7 +324,7 @@ class SpiceMagicEditor(CollabPlainTextEdit):
                 self.tab_pressed()
             elif e.key() == Qt.Key_Backspace:
                 self.suggestion = None
-                if self.get_current_line_text().endswith("    "):
+                if self.is_at_line_end() and self.get_current_line_text().endswith("    "):
                     for i in range(4):
                         self.textCursor().deletePreviousChar()
                 else:

@@ -6,9 +6,6 @@ from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import QApplication, QMainWindow, QSplitter, QPushButton, QVBoxLayout, QWidget, \
     QTabWidget, QFileDialog, QShortcut, QTabBar, QMessageBox, QToolBar, QDialog
 from easyconfig2.easyconfig import EasyConfig2 as EasyConfig
-from future.backports.socket import socket
-from sympy.physics.units import minutes
-from tbcontrol.fopdtitae import parameters
 
 import spiceditor.resources  # noqa
 from spiceditor.bw_timer import CountdownTimer
@@ -351,14 +348,14 @@ class MainWindow(QMainWindow):
         self.slides_tabs.currentWidget().set_writing_mode(mode)
 
     def keyPressEvent(self, a0):
-        if a0.key() == Qt.Key_F11:
+        if a0.key() == Qt.Key_F12:
             self.editors_tabs.currentWidget().execute_code()
         elif Qt.Key_F1 <= a0.key() <= Qt.Key_F10:
             idx = a0.key() - Qt.Key_F1
 
             if idx < self.slides_tabs.count():
                 self.slides_tabs.setCurrentIndex(idx)
-        elif a0.key() == Qt.Key_F12:
+        elif a0.key() == Qt.Key_F11:
             self.editors_tabs.currentWidget().execute_single_line(True)
         if a0.key() == Qt.Key_F1:
             self.toggle_focus()
@@ -410,6 +407,7 @@ class MainWindow(QMainWindow):
                 self.slides_tabs.addTab(slides, name)
                 self.slides_tabs.setCurrentWidget(slides)
                 slides.view.setFocus()
+        self.slides_tabs.setCurrentIndex(0)
 
     def closeEvent(self, a0):
         last = []

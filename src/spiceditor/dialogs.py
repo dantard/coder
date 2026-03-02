@@ -188,11 +188,12 @@ padding: 4px 10px;
 </tr>
 
 <tr>
-    <td>Execute whole code</td>
+    <td>Execute line and Advance</td>
     <td>F11</td>
 </tr>
+
 <tr>
-    <td>Execute line and Advance</td>
+    <td>Execute whole code</td>
     <td>F12</td>
 </tr>
 

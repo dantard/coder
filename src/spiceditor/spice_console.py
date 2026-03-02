@@ -2,7 +2,7 @@ import sys
 
 from PyQt5.QtCore import QTimer, pyqtSignal
 from PyQt5.QtGui import QFont
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QApplication
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QApplication, QPlainTextEdit, QTextEdit
 from easyconfig2.easyconfig import EasyConfig2
 from qtconsole.manager import QtKernelManager
 from qtconsole.rich_jupyter_widget import RichJupyterWidget
@@ -87,6 +87,7 @@ class JupyterConsole(SpiceConsole):
         self.timer.setSingleShot(True)
         self.timer.timeout.connect(self.done.emit)
 
+
     def set_editor_focus(self):
         self.jupyter_widget._control.setFocus()
 
@@ -111,8 +112,7 @@ class JupyterConsole(SpiceConsole):
             self.jupyter_widget.set_default_style(colors='lightbg')
 
     def execute(self, code, clear=True):
-
-
+#        self.jupyter_widget._control: QPlainTextEdit
         # self.jupyter_widget._control.setText("")
         # def filtering():
         #     text = self.editor.toPlainText()
@@ -139,20 +139,28 @@ class JupyterConsole(SpiceConsole):
                     self.jupyter_widget._control.clear()
 
         clearer = '''
+        %reset -f
         import sys
-        import os
-        import importlib
         
-        cwd = os.getcwd()
+        keep_prefixes = (
+            'jupyter', 'ipython', 'ipykernel', 'IPython',
+            'zmq', 'tornado', '_', 'warnings', 'builtins',
+            'sys', 'importlib', 'abc', 'io', 'os', 'types',
+            'typing', 'functools', 'collections', 'threading',
+            'traceback', 'inspect', 'weakref', 'enum', 'signal',
+            'logging', 'pathlib', 're', 'codecs', 'encodings',
+            'ast', 'dis', 'opcode', 'token', 'tokenize',
+        )
         
-        for module in sys.modules:
-            if module is None:
-                continue
+        mods_to_remove = [
+            m for m in sys.modules
+            if not any(m == p or m.startswith(p + '.') or m.startswith(p) for p in keep_prefixes)
+        ]
         
-            if hasattr(module, '__file__') and module.__file__ and module.__file__.startswith(cwd):
-                print("ole",  module.__file__)
-                importlib.reload(module)               
+        for m in mods_to_remove:
+            del sys.modules[m]            
         '''
+
         self.jupyter_widget.execute(clearer, hidden=True)
         QTimer.singleShot(100, run)
 

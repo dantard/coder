@@ -122,6 +122,9 @@ class EditorWidget(QWidget):
             self.language_editor.format_code()
 
         self.console.execute(self.language_editor.toPlainText(), not self.keep_banner.isChecked())
+        if "input(" in self.language_editor.toPlainText():
+            self.console.set_editor_focus()
+
 
     def execute_single_line(self, advance=False):
         line = self.language_editor.get_current_line()
