@@ -1,4 +1,5 @@
 import os
+import re
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QFont, QIcon, QTextCursor
@@ -87,7 +88,7 @@ class EditorWidget(QWidget):
 
     def load_program(self, path, show_all=False):
         self.path = path
-        with open(path, encoding="utf-8") as f:
+        with open(path, encoding="utf-8", errors="ignore") as f:
             self.language_editor.set_code(f.read())
             self.console.clear()
 
@@ -105,7 +106,10 @@ class EditorWidget(QWidget):
             self.path = filename.replace(".py", "") + ".py"
 
         with open(self.path, "w") as f:
-            f.write(self.language_editor.toPlainText())
+            #### f.write(self.language_editor.toPlainText())
+            text = self.language_editor.toPlainText()
+            text = text.encode("utf-8", errors="ignore").decode("utf-8")
+            f.write(text)
 
         name = os.path.basename(self.path)
         tab_wiget: QTabWidget = self.parent().parent()  # noqa
@@ -117,12 +121,27 @@ class EditorWidget(QWidget):
         self.language_editor.clear()
         # self.console_widget.clear()
 
+    def clean_for_utf8(self, s: str) -> str:
+        # Remove surrogates, noncharacters, and invalid JSON control chars
+        # \x09, \x0A, \x0D are tab, LF, CR which are safe
+        return re.sub(
+            r'[\ud800-\udfff\uFFFE\uFFFF\x00-\x08\x0B\x0C\x0E-\x1F]',
+            '',
+            s
+        )
+
     def execute_code(self):
         if self.config.root().get_child("format_code_before_run").get_value():
             self.language_editor.format_code()
 
-        self.console.execute(self.language_editor.toPlainText(), not self.keep_banner.isChecked())
-        if "input(" in self.language_editor.toPlainText():
+        #### self.console.execute(self.language_editor.toPlainText(), not self.keep_banner.isChecked())
+
+        text = self.language_editor.toPlainText()
+        text = text.encode("utf-8", errors="ignore").decode("utf-8", errors="ignore")
+        text = self.clean_for_utf8(text)
+        self.console.execute(text, not self.keep_banner.isChecked())
+
+        if "input(" in text:
             self.console.set_editor_focus()
 
 
