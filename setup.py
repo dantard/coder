@@ -13,7 +13,9 @@ setup(
         'qtconsole',
         'termqt',
         'easyconfig2',
-        'pyshortcuts'
+        'pyshortcuts',
+        'pysqlite3',
+        'python_csv'
     ],
     author='Danilo Tardioli',
     author_email='dantard@unizar.es',
