@@ -2,7 +2,7 @@ import os
 import sys
 
 from PyQt5.QtCore import Qt, QTimer
-from PyQt5.QtGui import QIcon
+from PyQt5.QtGui import QIcon, QKeyEvent
 from PyQt5.QtWidgets import QApplication, QMainWindow, QSplitter, QPushButton, QVBoxLayout, QWidget, \
     QTabWidget, QFileDialog, QShortcut, QTabBar, QMessageBox, QToolBar, QDialog
 from easyconfig2.easyconfig import EasyConfig2 as EasyConfig

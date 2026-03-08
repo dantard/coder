@@ -1,14 +1,15 @@
 import os
 import re
 
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QFont, QIcon, QTextCursor
+from PyQt5.QtCore import Qt, QEvent
+from PyQt5.QtGui import QFont, QIcon, QTextCursor, QKeyEvent
 from PyQt5.QtWidgets import QVBoxLayout, QToolBar, QStatusBar, QWidget, QComboBox, QShortcut, QTabWidget, QFileDialog, \
     QApplication, QDialog, QMessageBox
 
 from spiceditor import utils
 
 import spiceditor.resources  # noqa
+from spiceditor.spice_console import JupyterConsole
 
 
 class EditorWidget(QWidget):
@@ -38,9 +39,26 @@ class EditorWidget(QWidget):
         self.language_editor = language_editor
         self.console = console
 
+        if isinstance(self.console, JupyterConsole):
+            # [(key, modifier, action, event^), ...] ^if action is replace otherwise None
+            self.console.jupyter_widget.set_key_override(
+                [(Qt.Key_Up, Qt.NoModifier, "disable", None),
+                 (Qt.Key_Up, Qt.ShiftModifier, "disable", None),
+                 (Qt.Key_Return, Qt.ControlModifier, "run", self.execute_code),
+                 (Qt.Key_Up, Qt.ControlModifier, "replace", QKeyEvent(QEvent.Type.KeyPress,
+                                                                      Qt.Key_Up,
+                                                                      Qt.KeyboardModifier.NoModifier
+                                                                      )),
+                 (Qt.Key_Down, Qt.ControlModifier, "replace", QKeyEvent(QEvent.Type.KeyPress,
+                                                                    Qt.Key_Down,
+                                                                    Qt.KeyboardModifier.NoModifier
+                                                                    ))
+                 ])
+
+
+
         # Left side layout
         left_layout = QVBoxLayout()
-
         self.language_editor.ctrl_enter.connect(self.execute_code)
         self.language_editor.ctrl_shift_enter.connect(self.execute_single_line)
         self.language_editor.info.connect(self.update_status_bar)
@@ -138,12 +156,11 @@ class EditorWidget(QWidget):
 
         text = self.language_editor.toPlainText()
         text = text.encode("utf-8", errors="ignore").decode("utf-8", errors="ignore")
-        text = self.clean_for_utf8(text)
+        text = self.clean_for_utf8(text) + "\n\n"
         self.console.execute(text, not self.keep_banner.isChecked())
 
         if "input(" in text:
             self.console.set_editor_focus()
-
 
     def execute_single_line(self, advance=False):
         line = self.language_editor.get_current_line()

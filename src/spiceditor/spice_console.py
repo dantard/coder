@@ -1,8 +1,10 @@
 import sys
-
-from PyQt5.QtCore import QTimer, pyqtSignal
+from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtCore import Qt
+from PyQt5.QtCore import QTimer, pyqtSignal, Qt
 from PyQt5.QtGui import QFont
 from PyQt5.QtWidgets import QWidget, QVBoxLayout, QApplication, QPlainTextEdit, QTextEdit
+from PyQt5.uic.Compiler.qtproxies import QtCore
 from easyconfig2.easyconfig import EasyConfig2
 from qtconsole.manager import QtKernelManager
 from qtconsole.rich_jupyter_widget import RichJupyterWidget
@@ -50,7 +52,48 @@ class SpiceConsole(QWidget):
         pass
 
 
+class OverriddenBehaviorTextEdit(QTextEdit): # Not used
+    def __init__(self):
+        super().__init__()
+
+
+class SilentRichJupyterWidget(RichJupyterWidget):
+    def __init__(self):
+        #self.custom_control = OverriddenBehaviorTextEdit
+        super().__init__()
+        self.run = None
+        self._control.installEventFilter(self)
+
+
+
+    def set_key_override(self, keys):
+        self.keys = keys
+
+    def _handle_error(self, msg):
+        content = msg.get("content", {})
+        if content.get("ename") == "KeyboardInterrupt":
+            return  # no mostrar nada
+        super()._handle_error(msg)
+
+    def eventFilter(self, watched, event):
+        if watched == self._control:
+            if event.type() == 6:
+                for key, modifier, action, new_event in self.keys:
+                    if event.key() == key and event.modifiers() == modifier:
+                        if action == "run":
+                            new_event()
+                        elif action == "disable":
+                            pass
+                        elif action == "replace":
+                            print("replacing")
+                            super().eventFilter(watched, new_event)
+                            #QApplication.postEvent(watched, new_event)
+                        return True  # block jupyter from seeing it
+        return super().eventFilter(watched, event)
+
+
 class JupyterConsole(SpiceConsole):
+
 
     def __init__(self, config):
         super().__init__(config)
@@ -60,7 +103,7 @@ class JupyterConsole(SpiceConsole):
         kernel_client = kernel_manager.client()
         kernel_client.start_channels()
 
-        self.jupyter_widget = RichJupyterWidget()
+        self.jupyter_widget = SilentRichJupyterWidget()
 
         font = QFont("Monospace")
         font.setStyleHint(QFont.TypeWriter)
@@ -87,7 +130,6 @@ class JupyterConsole(SpiceConsole):
         self.timer.setSingleShot(True)
         self.timer.timeout.connect(self.done.emit)
 
-
     def set_editor_focus(self):
         self.jupyter_widget._control.setFocus()
 
@@ -102,7 +144,7 @@ class JupyterConsole(SpiceConsole):
 
         size = self.config.root().get_node("font_size").get_value()
 
-        if size>=0:
+        if size >= 0:
             self.set_font_size(size + 10)
 
     def set_dark_mode(self, value):
@@ -112,7 +154,7 @@ class JupyterConsole(SpiceConsole):
             self.jupyter_widget.set_default_style(colors='lightbg')
 
     def execute(self, code, clear=True):
-#        self.jupyter_widget._control: QPlainTextEdit
+        #        self.jupyter_widget._control: QPlainTextEdit
         # self.jupyter_widget._control.setText("")
         # def filtering():
         #     text = self.editor.toPlainText()
@@ -158,8 +200,14 @@ class JupyterConsole(SpiceConsole):
         ]
         
         for m in mods_to_remove:
-            del sys.modules[m]            
+            del sys.modules[m]
+        
+        
         '''
+
+        # check if kernel is busy, in that case interrupt it to avoid stuck state
+        if self.jupyter_widget.kernel_client.is_alive() and self.jupyter_widget._executing:
+            self.jupyter_widget.interrupt_kernel()
 
         self.jupyter_widget.execute(clearer, hidden=True)
         QTimer.singleShot(100, run)
@@ -184,7 +232,7 @@ class TermQtConsole(SpiceConsole):
         layout = QVBoxLayout()
         layout.addWidget(self.terminal)
         self.setLayout(layout)
-        self.setMinimumSize(600,400)
+        self.setMinimumSize(600, 400)
 
         my_platform = platform.system()
 
@@ -222,7 +270,7 @@ class TermQtConsole(SpiceConsole):
         # self.terminal.input("python")
         self.set_config(config)
 
-        QTimer.singleShot(100, lambda : self.resize(0))
+        QTimer.singleShot(100, lambda: self.resize(0))
 
     def resize(self, a0):
         self.terminal.resize(self.width(), self.height())
@@ -233,7 +281,7 @@ class TermQtConsole(SpiceConsole):
         self.init = terminal.addString("init", pretty="Init command (e.g. python)")
         self.temp_file = terminal.addString("temp_file", pretty="Temp file name")
         self.command = terminal.addString("command", pretty="Command")
-        #self.file_extension = terminal.addCombobox("file_extension", pretty="File extension", items=[".py", ".pas"])
+        # self.file_extension = terminal.addCombobox("file_extension", pretty="File extension", items=[".py", ".pas"])
 
     def config_read(self):
         super().config_read()

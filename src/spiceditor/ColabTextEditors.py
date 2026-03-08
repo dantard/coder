@@ -343,7 +343,6 @@ class CollabMixin:
 
     def _handle_new_peer(self):
         sock = self._server.nextPendingConnection()
-        print("diocane")
         self._peers.append(sock)
         self._buffers[sock] = ""
         sock.readyRead.connect(lambda: self._process_data(sock))
