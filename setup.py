@@ -31,7 +31,8 @@ setup(
         'console_scripts': [
             'spice=spiceditor.spice:main',
             'spiceterm=spiceditor.spiceterm:main',
-            'spiceinstall=spiceditor.install:create_shortcuts'
+            'spiceinstall=spiceditor.install:create_shortcuts',
+            'spicesqlbrowser=spiceditor.sqlbrowser:main'
         ],
     }
 )

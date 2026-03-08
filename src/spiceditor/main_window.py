@@ -10,7 +10,7 @@ from easyconfig2.easyconfig import EasyConfig2 as EasyConfig
 import spiceditor.resources  # noqa
 from spiceditor.bw_timer import CountdownTimer
 from spiceditor.dialogs import Author, ConnectionDialog
-#from spiceditor.double_tab_widget import DoubleTabWidget
+from spiceditor.double_tab_widget import DoubleTabWidget
 from spiceditor.editor_widget import EditorWidget
 from spiceditor.file_browser import FileBrowser
 from spiceditor.highlighter import PythonHighlighter, PascalHighlighter
@@ -55,6 +55,10 @@ class MainWindow(QMainWindow):
                                                      pretty="Toolbar mode (relaunch needed)",
                                                      items=["Vertical", "Horizontal"],
                                                      default=0)
+        self.cfg_split_view_mode = general.addCombobox("split_view_mode",
+                                                     pretty="Split view mode (relaunch needed)",
+                                                     items=["Vertical", "Horizontal"],
+                                                     default=0)
         hidden = self.config.root().addHidden("parameters")
         self.cfg_last = hidden.addList("last", default=[])
 
@@ -96,7 +100,7 @@ class MainWindow(QMainWindow):
         self.config.load("spiceditor.yaml")
         self.console_widget.config_read()
 
-        self.editors_tabs = QTabWidget() # DoubleTabWidget()
+        self.editors_tabs = DoubleTabWidget(Qt.Vertical if self.cfg_split_view_mode.get_value() == 0 else Qt.Horizontal)
         self.editors_tabs.addTab(self.base_editor, "Code")
         self.editors_tabs.setTabsClosable(True)
         self.editors_tabs.tabCloseRequested.connect(self.remove_editor_tab)
@@ -164,6 +168,9 @@ class MainWindow(QMainWindow):
 
         m1.aboutToShow.connect(fill)
 
+        q = QShortcut("Ctrl+O", self)
+        q.activated.connect(self.toggle_split_view_mode)
+
         q = QShortcut("Ctrl+M", self)
         q.activated.connect(self.toggle_color_scheme)
 
@@ -175,6 +182,10 @@ class MainWindow(QMainWindow):
 
         q = QShortcut("Ctrl+E", self)
         q.activated.connect(lambda: self.new_editor_tab(self.console_widget))
+
+        q = QShortcut("Ctrl+Q", self)
+        q.activated.connect(lambda: self.new_editor_tab2(self.console_widget))
+
 
         q = QShortcut("Ctrl+L", self)
         q.activated.connect(self.toggle_fullscreen)
@@ -208,6 +219,10 @@ class MainWindow(QMainWindow):
 
         QTimer.singleShot(10, self.finish_config)
 
+
+    def toggle_split_view_mode(self):
+        self.editors_tabs.setOrientation(Qt.Horizontal if self.editors_tabs.orientation() == Qt.Vertical else Qt.Vertical)
+
     def connect_to_host(self):
         dialog = ConnectionDialog(self.userid if self.userid else "User", self)
         if dialog.exec_() == QDialog.Accepted:
@@ -237,11 +252,13 @@ class MainWindow(QMainWindow):
         if self.show_iter == 0:
             self.sizes = self.splitter.sizes()
 
-        self.show_iter = (self.show_iter + 1) % 3
+        self.show_iter = (self.show_iter + 1) % 4
         if self.show_iter == 1:
             self.splitter.setSizes([0, 0, int(self.width() * 0.4)])
         elif self.show_iter == 2:
             self.splitter.setSizes([0, int(self.width() * 0.4), 0])
+        elif self.show_iter == 3:
+            self.splitter.setSizes([0, int(self.width() * 0.4), int(self.width() * 0.4)])
         else:
             self.splitter.setSizes(self.sizes)
 
@@ -326,6 +343,16 @@ class MainWindow(QMainWindow):
         editor.set_dark_mode(self.cfg_dark.get_value() == 1)
         self.editors_tabs.setCurrentWidget(editor)
         self.apply_config()
+
+    def new_editor_tab2(self, console):
+        editor = EditorWidget(self.get_editor(), console, self.config)
+        editor.file_modified.connect(self.file_modified)
+
+        self.editors_tabs.addTab(editor, "Code", 1)
+        editor.set_dark_mode(self.cfg_dark.get_value() == 1)
+        self.editors_tabs.setCurrentWidget(editor)
+        self.apply_config()
+
 
     def editor_tab_changed(self, index):
         pass

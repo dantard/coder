@@ -169,6 +169,7 @@ class EditorWidget(QWidget):
 
     def set_automatic_reload(self):
         self.sb.showMessage("File will be reloaded automatically", 2000)
+        self.reload_clicked()
         self.automatic_reload = True
 
     def reload_clicked(self):
