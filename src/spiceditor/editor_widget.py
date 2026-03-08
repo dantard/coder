@@ -1,10 +1,10 @@
 import os
 import re
 
-from PyQt5.QtCore import Qt, QEvent
+from PyQt5.QtCore import Qt, QEvent, QFileSystemWatcher, QTimer, pyqtSignal
 from PyQt5.QtGui import QFont, QIcon, QTextCursor, QKeyEvent
 from PyQt5.QtWidgets import QVBoxLayout, QToolBar, QStatusBar, QWidget, QComboBox, QShortcut, QTabWidget, QFileDialog, \
-    QApplication, QDialog, QMessageBox
+    QApplication, QDialog, QMessageBox, QLabel, QHBoxLayout, QPushButton, QSizePolicy
 
 from spiceditor import utils
 
@@ -12,12 +12,66 @@ import spiceditor.resources  # noqa
 from spiceditor.spice_console import JupyterConsole
 
 
+class MyStatusBar(QStatusBar):
+    def __init__(self):
+        super().__init__()
+        self.setSizeGripEnabled(False)
+        self.label = QLabel()
+
+        self.label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        self.label.setContentsMargins(0, 5, 0, 0)
+        self.addWidget(self.label)
+
+        self.buttons = []
+        self.x_button = QPushButton("❌")
+        self.x_button.setMaximumWidth(25)
+        self.x_button.hide()
+        self.x_button.setContentsMargins(0, 5, 0, 0)
+        self.x_button.clicked.connect(self.reset)
+        self.addPermanentWidget(self.x_button)
+
+        self.timer = QTimer()
+        self.timer.setSingleShot(True)
+        self.timer.timeout.connect(self.reset)
+
+    def showMessage(self, message, msecs=0, *args, **kwargs):
+        font = self.label.font()
+        font.setBold(kwargs.get("bold", False))
+        self.label.setFont(font)
+        self.label.setText(message)
+        self.x_button.show()
+
+        for button in self.buttons:
+            self.removeWidget(button)
+
+        buttons = kwargs.get("buttons", [])
+        for name, callback in buttons:
+            button = QPushButton(name)
+            button.clicked.connect(callback)
+            button.show()
+            self.insertPermanentWidget(1, button)
+            self.buttons.append(button)
+
+        if msecs > 0:
+            self.timer.stop()
+            self.timer.start(msecs)
+
+    def reset(self):
+        self.label.setText("")
+        self.x_button.hide()
+        for button in self.buttons:
+            self.removeWidget(button)
+
+
 class EditorWidget(QWidget):
+    file_modified = pyqtSignal(object, bool)
 
     def __init__(self, language_editor, console, config):
         super().__init__()
+        self.automatic_reload = False
         self.path = None
         self.config = config
+        self.modified_internally = False
         editor = config.root().getSubSection("editor", pretty="Editor")
         self.cfg_keep_code = editor.getCheckBox("keep_code",
                                                 pretty="Keep Code on Run",
@@ -50,12 +104,10 @@ class EditorWidget(QWidget):
                                                                       Qt.KeyboardModifier.NoModifier
                                                                       )),
                  (Qt.Key_Down, Qt.ControlModifier, "replace", QKeyEvent(QEvent.Type.KeyPress,
-                                                                    Qt.Key_Down,
-                                                                    Qt.KeyboardModifier.NoModifier
-                                                                    ))
+                                                                        Qt.Key_Down,
+                                                                        Qt.KeyboardModifier.NoModifier
+                                                                        ))
                  ])
-
-
 
         # Left side layout
         left_layout = QVBoxLayout()
@@ -83,15 +135,49 @@ class EditorWidget(QWidget):
         left_layout.addWidget(bar)
         left_layout.addWidget(self.language_editor)
 
-        self.sb = QStatusBar()
+        self.sb = MyStatusBar()
         left_layout.addWidget(self.sb)
-        left_layout.setSpacing(0)
+        # left_layout.setSpacing(0)
 
         self.setLayout(left_layout)
         self.setLayout(left_layout)
 
         q = QShortcut("F5", self)
         q.activated.connect(self.language_editor.format_code)
+
+        self.file_watcher = QFileSystemWatcher()
+        self.file_watcher.fileChanged.connect(self.on_file_changed)
+
+    def is_modified(self):
+        return self.modified
+
+    def on_file_changed(self, path):
+
+        if self.automatic_reload:
+            focus = QApplication.focusWidget()
+            self.reload_clicked()
+            if focus:
+                focus.setFocus()
+            return
+
+        if not self.modified_internally:
+            self.sb.showMessage("Nothing to reload", buttons=[("Reload", self.reload_clicked),
+                                                              ("Reload Automatically", self.set_automatic_reload)])
+
+            self.file_modified.emit(self, True)
+        self.modified_internally = False
+
+    def set_automatic_reload(self):
+        self.sb.showMessage("File will be reloaded automatically", 2000)
+        self.automatic_reload = True
+
+    def reload_clicked(self):
+        self.modified_internally = True
+        if self.path is not None:
+            self.load_program(self.path, show_all=True)
+            self.sb.showMessage("File reloaded", 2000)
+        else:
+            self.sb.showMessage("Nothing to reload", 2000)
 
     def update_config(self):
         self.keep_banner.setChecked(self.cfg_keep_code.get())
@@ -109,6 +195,13 @@ class EditorWidget(QWidget):
         with open(path, encoding="utf-8", errors="ignore") as f:
             self.language_editor.set_code(f.read())
             self.console.clear()
+            if len(self.file_watcher.files()) > 0:
+                print("Removing paths from file watcher", self.file_watcher.files())
+                self.file_watcher.removePaths(self.file_watcher.files())
+            print("Adding path to file watcher", path)
+            self.file_watcher.addPath(path)
+            self.file_modified.emit(self, False)
+            self.modified_internally = False
 
         if show_all:
             self.show_all_code()
@@ -120,9 +213,13 @@ class EditorWidget(QWidget):
                                                        directory=path)
             if not filename:
                 return
-
+            if len(self.file_watcher.files()) > 0:
+                self.file_watcher.removePaths(self.file_watcher.files())
             self.path = filename.replace(".py", "") + ".py"
+            self.file_watcher.addPath(self.path)
+            self.file_modified.emit(self, False)
 
+        self.modified_internally = True
         with open(self.path, "w") as f:
             #### f.write(self.language_editor.toPlainText())
             text = self.language_editor.toPlainText()
@@ -200,6 +297,7 @@ class EditorWidget(QWidget):
         self.prog_cb.setCurrentIndex(self.prog_cb.findText(value))
 
     def update_status_bar(self, x, diff, timeout):
+        return
         if self.cfg_show_sb.get_value():
             if timeout != 0:
                 x = "{:5d} | {}".format(diff, x)

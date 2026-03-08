@@ -10,6 +10,7 @@ from easyconfig2.easyconfig import EasyConfig2 as EasyConfig
 import spiceditor.resources  # noqa
 from spiceditor.bw_timer import CountdownTimer
 from spiceditor.dialogs import Author, ConnectionDialog
+#from spiceditor.double_tab_widget import DoubleTabWidget
 from spiceditor.editor_widget import EditorWidget
 from spiceditor.file_browser import FileBrowser
 from spiceditor.highlighter import PythonHighlighter, PascalHighlighter
@@ -88,13 +89,14 @@ class MainWindow(QMainWindow):
         self.console_widget = console(self.config)
 
         self.base_editor = EditorWidget(self.get_editor(), self.console_widget, self.config)
+        self.base_editor.file_modified.connect(self.file_modified)
         if args.host:
             self.base_editor.get_editor().start_server(args.userid if args.userid else "host")
 
         self.config.load("spiceditor.yaml")
         self.console_widget.config_read()
 
-        self.editors_tabs = QTabWidget()
+        self.editors_tabs = QTabWidget() # DoubleTabWidget()
         self.editors_tabs.addTab(self.base_editor, "Code")
         self.editors_tabs.setTabsClosable(True)
         self.editors_tabs.tabCloseRequested.connect(self.remove_editor_tab)
@@ -186,6 +188,10 @@ class MainWindow(QMainWindow):
         q = QShortcut("Ctrl+K", self)
         q.activated.connect(self.show_only)
 
+        q = QShortcut("Ctrl+R", self)
+        q.activated.connect(lambda: self.editors_tabs.currentWidget().reload_clicked())
+
+
         for elem in self.cfg_last.get_value():
             self.open_slides(elem.get("filename"), elem.get("page", 0))
 
@@ -247,6 +253,7 @@ class MainWindow(QMainWindow):
 
     def file_clicked(self, path):
         editor = EditorWidget(self.get_editor(), self.console_widget, self.config)
+        editor.file_modified.connect(self.file_modified)
         editor.load_program(path, self.show_all_code_action.isChecked())
         self.editors_tabs.addTab(editor, os.path.basename(path))
         editor.set_dark_mode(self.cfg_dark.get_value() == 1)
@@ -302,8 +309,18 @@ class MainWindow(QMainWindow):
         else:
             self.editors_tabs.widget(0).clear()
 
+    def file_modified(self, widget, value):
+        idx = self.editors_tabs.indexOf(widget)
+        if idx == -1:
+            return
+        title = self.editors_tabs.tabText(idx)
+        title = title.replace("*", "")
+        title = title + "*" if value else title
+        self.editors_tabs.setTabText(idx, title)
+
     def new_editor_tab(self, console):
         editor = EditorWidget(self.get_editor(), console, self.config)
+        editor.file_modified.connect(self.file_modified)
 
         self.editors_tabs.addTab(editor, "Code")
         editor.set_dark_mode(self.cfg_dark.get_value() == 1)
