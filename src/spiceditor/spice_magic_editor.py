@@ -4,8 +4,8 @@ import re
 import autopep8
 from PyQt5 import QtGui
 from PyQt5.QtCore import pyqtSignal, Qt, QTimer, QMimeData, QSize, QRect
-from PyQt5.QtGui import QFont, QFontMetrics, QColor, QPainter, QTextCursor, QTextFormat
-from PyQt5.QtWidgets import QTextEdit, QHBoxLayout, QScrollBar, QApplication, QWidget, QPlainTextEdit
+from PyQt5.QtGui import QFont, QFontMetrics, QColor, QPainter, QTextCursor, QTextFormat,QTextCursor, QKeySequence
+from PyQt5.QtWidgets import QTextEdit, QHBoxLayout, QScrollBar, QApplication, QWidget, QPlainTextEdit, QShortcut
 
 from spiceditor.line_number_text_edit import LineNumberTextEdit
 from spiceditor.magic_scrollbar import MagicScrollBar
@@ -29,6 +29,7 @@ class LineNumberArea(QWidget):
 class SpiceMagicEditor(CollabPlainTextEdit):
     ctrl_enter = pyqtSignal()
     ctrl_shift_enter = pyqtSignal()
+    focus_in = pyqtSignal()
     info = pyqtSignal(str, int, int)
 
     def __init__(self, highlighter=None, font_size=18):
@@ -70,6 +71,37 @@ class SpiceMagicEditor(CollabPlainTextEdit):
             self.highlighter.setDocument(self.document())
 
         self.set_font_size(font_size)
+        shortcut = QShortcut(QKeySequence("Ctrl+/"), self)
+        shortcut.activated.connect(self.toggle_comment)
+
+    def toggle_comment(self):
+        cursor = self.textCursor()
+        start = cursor.selectionStart()
+        end = cursor.selectionEnd()
+
+        cursor.setPosition(start)
+        cursor.movePosition(QTextCursor.StartOfLine)
+        cursor.setPosition(end, QTextCursor.KeepAnchor)
+        cursor.movePosition(QTextCursor.EndOfLine, QTextCursor.KeepAnchor)
+
+        lines = cursor.selectedText().split('\u2029')
+        all_commented = all(l.startswith('#') for l in lines if l.strip())
+
+        if all_commented:
+            lines = [l[1:] if l.startswith('#') else l for l in lines]
+        else:
+            lines = ['#' + l for l in lines]
+
+        cursor.insertText('\u2029'.join(lines))
+
+        # restore selection
+        cursor.setPosition(start)
+        cursor.setPosition(start + len('\u2029'.join(lines)), QTextCursor.KeepAnchor)
+        self.setTextCursor(cursor)
+
+    def focusInEvent(self, e):
+        super().focusInEvent(e)
+        self.focus_in.emit()
 
     def line_number_area_width(self):
         digits = len(str(max(1, self.blockCount())))

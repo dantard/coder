@@ -65,6 +65,7 @@ class MyStatusBar(QStatusBar):
 
 class EditorWidget(QWidget):
     file_modified = pyqtSignal(object, bool)
+    focus_in = pyqtSignal(object)
 
     def __init__(self, language_editor, console, config):
         super().__init__()
@@ -93,27 +94,12 @@ class EditorWidget(QWidget):
         self.language_editor = language_editor
         self.console = console
 
-        if isinstance(self.console, JupyterConsole):
-            # [(key, modifier, action, event^), ...] ^if action is replace otherwise None
-            self.console.jupyter_widget.set_key_override(
-                [(Qt.Key_Up, Qt.NoModifier, "disable", None),
-                 (Qt.Key_Up, Qt.ShiftModifier, "disable", None),
-                 (Qt.Key_Return, Qt.ControlModifier, "run", self.execute_code),
-                 (Qt.Key_Up, Qt.ControlModifier, "replace", QKeyEvent(QEvent.Type.KeyPress,
-                                                                      Qt.Key_Up,
-                                                                      Qt.KeyboardModifier.NoModifier
-                                                                      )),
-                 (Qt.Key_Down, Qt.ControlModifier, "replace", QKeyEvent(QEvent.Type.KeyPress,
-                                                                        Qt.Key_Down,
-                                                                        Qt.KeyboardModifier.NoModifier
-                                                                        ))
-                 ])
-
         # Left side layout
         left_layout = QVBoxLayout()
         self.language_editor.ctrl_enter.connect(self.execute_code)
         self.language_editor.ctrl_shift_enter.connect(self.execute_single_line)
         self.language_editor.info.connect(self.update_status_bar)
+        self.language_editor.focus_in.connect(lambda : self.focus_in.emit(self))
 
         bar = QToolBar()
 
@@ -161,7 +147,7 @@ class EditorWidget(QWidget):
             return
 
         if not self.modified_internally:
-            self.sb.showMessage("Nothing to reload", buttons=[("Reload", self.reload_clicked),
+            self.sb.showMessage("File changed externally", buttons=[("Reload", self.reload_clicked),
                                                               ("Reload Automatically", self.set_automatic_reload)])
 
             self.file_modified.emit(self, True)
@@ -247,6 +233,7 @@ class EditorWidget(QWidget):
         )
 
     def execute_code(self):
+        self.language_editor.setFocus()
         if self.config.root().get_child("format_code_before_run").get_value():
             self.language_editor.format_code()
 

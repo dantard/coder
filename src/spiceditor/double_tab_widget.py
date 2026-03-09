@@ -1,4 +1,4 @@
-from PyQt5.QtCore import pyqtSignal,Qt
+from PyQt5.QtCore import pyqtSignal,Qt, QEvent
 from PyQt5.QtWidgets import QSplitter, QTabWidget, QTabBar
 
 
@@ -17,12 +17,15 @@ class DoubleTabWidget(QSplitter):
 
     def __init__(self, orientation=Qt.Vertical, parent=None):
         super().__init__(parent)
+        self.current_widget = None
         self.left = self.add()
         self.right = self.add()
 
         self.setOrientation(orientation)
         if orientation == Qt.Vertical:
             self.right.setTabPosition(QTabWidget.South)
+        else:
+            self.right.setTabPosition(QTabWidget.North)
         self.right.hide()
 
         self.left.tabCloseRequested.connect(self.left_tab_close_requested)
@@ -36,6 +39,27 @@ class DoubleTabWidget(QSplitter):
         self.right.removeTab(index)
         if self.right.count() == 0:
             self.right.hide()
+
+    def indexOf(self, w):
+        index = self.left.indexOf(w)
+        if index != -1:
+            return index
+        index = self.right.indexOf(w)
+        if index != -1:
+            return self.left.count() + index
+        return -1
+
+    def tabText(self, index):
+        if index < self.left.count():
+            return self.left.tabText(index)
+        else:
+            return self.right.tabText(index - self.left.count())
+
+    def setTabText(self, index, text):
+        if index < self.left.count():
+            self.left.setTabText(index, text)
+        else:
+            self.right.setTabText(index - self.left.count(), text)
 
     def on_tab_double_clicked(self, tab_widget, tab_index):
         print("Tab double-clicked:", tab_widget, tab_index)
@@ -64,28 +88,60 @@ class DoubleTabWidget(QSplitter):
         self.addWidget(widget)
         return widget
 
+
+    def widget_focused(self, widget):
+        self.current_widget = widget
+        for i in range(self.left.count()):
+            self.left.tabBar().setTabTextColor(i, Qt.black)
+        for i in range(self.right.count()):
+            self.right.tabBar().setTabTextColor(i, Qt.black)
+
+        if widget in [self.left.widget(i) for i in range(self.left.count())]:
+            index = self.left.indexOf(widget)
+            self.left.tabBar().setTabTextColor(index, Qt.red)
+        elif widget in [self.right.widget(i) for i in range(self.right.count())]:
+            index = self.right.indexOf(widget)
+            self.right.tabBar().setTabTextColor(index, Qt.red)
+
     def addTab(self, widget, name, index=0):
+        self.current_widget = widget
+        widget.focus_in.connect(self.widget_focused)
         if index == 0:
             return self.left.addTab(widget, name)
         else:
             self.right.addTab(widget, name)
             self.right.show()
 
+
+
     def setTabsClosable(self, value):
         self.left.setTabsClosable(value)
         self.right.setTabsClosable(value)
 
     def currentWidget(self):
-        return self.left.currentWidget()
+        return self.current_widget
 
     def widget(self, index):
-        return self.left.widget(index)
+        if index < self.left.count():
+            return self.left.widget(index)
+        else:
+            return self.right.widget(index - self.left.count())
 
     def count(self):
-        return self.left.count()
+        return self.left.count() + self.right.count()
+
 
     def setCurrentWidget(self, widget):
         if widget in [self.left.widget(i) for i in range(self.left.count())]:
             self.left.setCurrentWidget(widget)
         elif widget in [self.right.widget(i) for i in range(self.right.count())]:
             self.right.setCurrentWidget(widget)
+        self.current_widget = widget
+
+    def toggle_orientation(self):
+        if self.orientation() == Qt.Vertical:
+            self.setOrientation(Qt.Horizontal)
+            self.right.setTabPosition(QTabWidget.North)
+        else:
+            self.setOrientation(Qt.Vertical)
+            self.right.setTabPosition(QTabWidget.South)

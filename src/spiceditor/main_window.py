@@ -1,7 +1,7 @@
 import os
 import sys
 
-from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtCore import Qt, QTimer,QEvent
 from PyQt5.QtGui import QIcon, QKeyEvent
 from PyQt5.QtWidgets import QApplication, QMainWindow, QSplitter, QPushButton, QVBoxLayout, QWidget, \
     QTabWidget, QFileDialog, QShortcut, QTabBar, QMessageBox, QToolBar, QDialog
@@ -72,7 +72,7 @@ class MainWindow(QMainWindow):
                                                 pretty="Show all Code on Open",
                                                 default=False)
 
-        self.cfg_show_all = general.getCheckBox("format_code_before_run",
+        self.cfg_format_before_run = general.getCheckBox("format_code_before_run",
                                                 pretty="Format Code before Run",
                                                 default=False)
         self.cfg_click_to_next = general.addCombobox("click_to_next", pretty="Click to go to next slide",
@@ -91,6 +91,23 @@ class MainWindow(QMainWindow):
         self.slides_tabs.currentChanged.connect(self.tab_changed)
         self.slides_tabs.tabBar().setTabButton(0, QTabBar.ButtonPosition.RightSide, None)
         self.console_widget = console(self.config)
+
+        if isinstance(self.console_widget, JupyterConsole):
+            # [(key, modifier, action, event^), ...] ^if action is replace otherwise None
+            self.console_widget.jupyter_widget.set_key_override(
+                [(Qt.Key_Up, Qt.NoModifier, "disable", None),
+                 (Qt.Key_Up, Qt.ShiftModifier, "disable", None),
+                 (Qt.Key_Return, Qt.ControlModifier, "run", lambda: self.editors_tabs.currentWidget().execute_code()),
+                 (Qt.Key_Up, Qt.ControlModifier, "replace", QKeyEvent(QEvent.Type.KeyPress,
+                                                                      Qt.Key_Up,
+                                                                      Qt.KeyboardModifier.NoModifier
+                                                                      )),
+                 (Qt.Key_Down, Qt.ControlModifier, "replace", QKeyEvent(QEvent.Type.KeyPress,
+                                                                        Qt.Key_Down,
+                                                                        Qt.KeyboardModifier.NoModifier
+                                                                        ))
+                 ])
+
 
         self.base_editor = EditorWidget(self.get_editor(), self.console_widget, self.config)
         self.base_editor.file_modified.connect(self.file_modified)
@@ -123,7 +140,7 @@ class MainWindow(QMainWindow):
         self.show_all_code_action = self.general_toolbar.addAction("Show all code")
         self.show_all_code_action.setIcon(QIcon(":/icons/radio-button.svg"))
         self.show_all_code_action.setCheckable(True)
-        self.show_all_code_action.setChecked(self.cfg_show_all.get_value() or False)
+        self.show_all_code_action.setChecked(self.cfg_show_all.get_value())
 
         self.new_dir = self.general_toolbar.addAction("New Folder")
         self.new_dir.setIcon(QIcon(":/icons/folder.svg"))
@@ -221,7 +238,7 @@ class MainWindow(QMainWindow):
 
 
     def toggle_split_view_mode(self):
-        self.editors_tabs.setOrientation(Qt.Horizontal if self.editors_tabs.orientation() == Qt.Vertical else Qt.Vertical)
+        self.editors_tabs.toggle_orientation()
 
     def connect_to_host(self):
         dialog = ConnectionDialog(self.userid if self.userid else "User", self)
