@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='spiceditor',
-    version='0.0.12',
+    version='0.0.14',
     packages=find_packages(where='src'),  # Specify src directory
     package_dir={'': 'src'},  # Tell setuptools that packages are under src
     install_requires=[

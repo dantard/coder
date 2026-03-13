@@ -33,8 +33,10 @@ class MyStatusBar(QStatusBar):
         self.timer = QTimer()
         self.timer.setSingleShot(True)
         self.timer.timeout.connect(self.reset)
+        self.hide()
 
     def showMessage(self, message, msecs=0, *args, **kwargs):
+        self.show()
         font = self.label.font()
         font.setBold(kwargs.get("bold", False))
         self.label.setFont(font)
@@ -61,6 +63,7 @@ class MyStatusBar(QStatusBar):
         self.x_button.hide()
         for button in self.buttons:
             self.removeWidget(button)
+        self.hide()
 
 
 class EditorWidget(QWidget):

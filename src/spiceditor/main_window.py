@@ -126,6 +126,9 @@ class MainWindow(QMainWindow):
         helper = QWidget()
         helper.setLayout(QVBoxLayout())
         helper.layout().addWidget(self.editors_tabs)
+        helper.setContentsMargins(0, 0, 0, 0)
+        helper.layout().setContentsMargins(0,5,0,0)
+        helper.layout().setSpacing(0)
 
         self.file_browser = FileBrowser(self.cfg_progs_path.get_value(), filters=[".py", ".csv", ".txt", ".yaml"], )
         self.file_browser.signals.file_selected.connect(self.file_clicked)
@@ -468,7 +471,7 @@ class MainWindow(QMainWindow):
                 self.slides_tabs.addTab(slides, name)
                 self.slides_tabs.setCurrentWidget(slides)
                 slides.view.setFocus()
-        self.slides_tabs.setCurrentIndex(0)
+        #self.slides_tabs.setCurrentIndex(0)
 
     def closeEvent(self, a0):
         last = []

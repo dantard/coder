@@ -20,6 +20,7 @@ class DoubleTabWidget(QSplitter):
         self.current_widget = None
         self.left = self.add()
         self.right = self.add()
+        self.setContentsMargins(0, 0, 0, 0)
 
         self.setOrientation(orientation)
         if orientation == Qt.Vertical:

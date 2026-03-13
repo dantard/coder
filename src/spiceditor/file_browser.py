@@ -11,6 +11,10 @@ from PyQt5.QtWidgets import QWidget, QTreeView, QFileSystemModel, QVBoxLayout, Q
 class Tree(QTreeView):
     delete_requested = pyqtSignal(str)
 
+    def __init__(self):
+        super().__init__()
+        self.setMouseTracking(True)
+
     def filter_rows(self, extensions=None):
 
         extensions = extensions or [".txt", ".py", ".csv"]
@@ -41,6 +45,12 @@ class Tree(QTreeView):
                 if res == delete:
                     self.delete_requested.emit(path)
 
+class FileSystemModelWithTooltip(QFileSystemModel):
+    def data(self, index, role=Qt.DisplayRole):
+        if role == Qt.ToolTipRole:
+            return self.filePath(index)
+        return super().data(index, role)
+
 
 class FileBrowser(QWidget):
     class Signals(QObject):
@@ -53,7 +63,7 @@ class FileBrowser(QWidget):
         self.path = path
         self.treeview = Tree()
         self.treeview.delete_requested.connect(self.delete_requested)
-        self.dirModel = QFileSystemModel()
+        self.dirModel = FileSystemModelWithTooltip()
         self.dirModel.directoryLoaded.connect(lambda:self.treeview.filter_rows(filters))
         #self.dirModel.setNameFilters(filters)
         self.dirModel.setNameFilterDisables(False)
@@ -69,7 +79,6 @@ class FileBrowser(QWidget):
         #tb.addAction("🗀", self.refresh)
 
         #vlayout.addWidget(tb)
-
         self.layout().addWidget(self.treeview)
         self.treeview.selectionModel().selectionChanged.connect(self.on_current_changed)
         self.treeview.doubleClicked.connect(self.on_double_clicked)
