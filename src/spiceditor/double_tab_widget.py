@@ -143,7 +143,8 @@ class DoubleTabWidget(QSplitter):
     def widget_focused(self, widget):
         if self.master is not None:
             return
-
+        if widget is None:
+            widget = self.left.currentWidget()
         self.current_widget = widget
         for i in range(self.left.count()):
             self.left.tabBar().setTabTextColor(i, Qt.black)
@@ -191,6 +192,7 @@ class DoubleTabWidget(QSplitter):
         elif widget in [self.right.widget(i) for i in range(self.right.count())]:
             self.right.setCurrentWidget(widget)
         self.current_widget = widget
+        print("setting")
 
     def toggle_orientation(self):
         if self.orientation() == Qt.Vertical:
