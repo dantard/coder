@@ -1,9 +1,10 @@
 from PyQt5.QtCore import pyqtSignal,Qt, QEvent
-from PyQt5.QtWidgets import QSplitter, QTabWidget, QTabBar
+from PyQt5.QtWidgets import QSplitter, QTabWidget, QTabBar, QMenu
 
 
 class DoubleClickTabBar(QTabBar):
     tabDoubleClicked = pyqtSignal(object, int)  # emits the tab index
+    context_menu_requested = pyqtSignal(object,str, int)  # emits the tab index
 
     def mouseDoubleClickEvent(self, event):
         index = self.tabAt(event.pos())
@@ -11,9 +12,20 @@ class DoubleClickTabBar(QTabBar):
             self.tabDoubleClicked.emit(self.parent(), index)
         super().mouseDoubleClickEvent(event)
 
+    def contextMenuEvent(self, a0):
+        menu = QMenu()
+        sam = menu.addAction("Toggle Master")
+        result = menu.exec(a0.globalPos())
+        if result == sam:
+            index = self.tabAt(a0.pos())
+            if index >= 0:
+                self.context_menu_requested.emit(self.parent(), "SAM", index)
+
+
 class DoubleTabWidget(QSplitter):
     tabCloseRequested = pyqtSignal(int)
     currentChanged = pyqtSignal(int)
+    set_master_requested = pyqtSignal(object)
 
     def __init__(self, orientation=Qt.Vertical, parent=None):
         super().__init__(parent)
@@ -21,6 +33,7 @@ class DoubleTabWidget(QSplitter):
         self.left = self.add()
         self.right = self.add()
         self.setContentsMargins(0, 0, 0, 0)
+        self.master = None
 
         self.setOrientation(orientation)
         if orientation == Qt.Vertical:
@@ -31,15 +44,46 @@ class DoubleTabWidget(QSplitter):
 
         self.left.tabCloseRequested.connect(self.left_tab_close_requested)
         self.right.tabCloseRequested.connect(self.right_tab_close_requested)
+        self.left.currentChanged.connect(self.left_current_changed)
+        self.right.currentChanged.connect(self.right_current_changed)
+
+    def left_current_changed(self, index):
+        self.currentChanged.emit(index)
+        widget = self.left.widget(index)
+        self.widget_focused(widget)
+
+
+    def right_current_changed(self, index):
+        self.currentChanged.emit(index + self.left.count())
+        widget = self.left.widget(index)
+        self.widget_focused(widget)
+
+
+    def set_master(self, master):
+        self.master = master
+        for i in range(self.left.count()):
+            self.left.tabBar().setTabTextColor(i, Qt.black)
+        for i in range(self.right.count()):
+            self.right.tabBar().setTabTextColor(i, Qt.black)
+        if master in [self.left.widget(i) for i in range(self.left.count())]:
+            index = self.left.indexOf(master)
+            self.left.tabBar().setTabTextColor(index, Qt.blue)
+        elif master in [self.right.widget(i) for i in range(self.right.count())]:
+            index = self.right.indexOf(master)
+            self.right.tabBar().setTabTextColor(index, Qt.blue)
+
 
     def left_tab_close_requested(self, index):
+        self.tabCloseRequested.emit(index)
         if self.left.count() > 1:
             self.left.removeTab(index)
 
     def right_tab_close_requested(self, index):
+        self.tabCloseRequested.emit(index + self.left.count())
         self.right.removeTab(index)
         if self.right.count() == 0:
             self.right.hide()
+
 
     def indexOf(self, w):
         index = self.left.indexOf(w)
@@ -86,11 +130,20 @@ class DoubleTabWidget(QSplitter):
         tab_bar = DoubleClickTabBar()
         widget.setTabBar(tab_bar)
         tab_bar.tabDoubleClicked.connect(self.on_tab_double_clicked)
+        tab_bar.context_menu_requested.connect(self.on_context_menu_requested)
         self.addWidget(widget)
         return widget
 
+    def on_context_menu_requested(self, tab_widget, action, index):
+        editor_widget = tab_widget.widget(index)
+        #editor_widget_index = self.indexOf(editor_widget)
+        self.set_master_requested.emit(editor_widget)
+
 
     def widget_focused(self, widget):
+        if self.master is not None:
+            return
+
         self.current_widget = widget
         for i in range(self.left.count()):
             self.left.tabBar().setTabTextColor(i, Qt.black)

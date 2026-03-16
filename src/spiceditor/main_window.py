@@ -42,6 +42,8 @@ class MainWindow(QMainWindow):
 
         self.show_iter = 0
         self.sizes = None
+        self.master_widget = None
+
         self.config = EasyConfig(immediate=True)
         general = self.config.root()
         self.cfg_dark = general.addCombobox("dark", pretty="Mode", items=["Light", "Dark"], default=0)
@@ -111,6 +113,7 @@ class MainWindow(QMainWindow):
 
         self.base_editor = EditorWidget(self.get_editor(), self.console_widget, self.config)
         self.base_editor.file_modified.connect(self.file_modified)
+        self.base_editor.execute_called.connect(self.execute_called)
         if args.host:
             self.base_editor.get_editor().start_server(args.userid if args.userid else "host")
 
@@ -120,8 +123,9 @@ class MainWindow(QMainWindow):
         self.editors_tabs = DoubleTabWidget(Qt.Vertical if self.cfg_split_view_mode.get_value() == 0 else Qt.Horizontal)
         self.editors_tabs.addTab(self.base_editor, "Code")
         self.editors_tabs.setTabsClosable(True)
-        self.editors_tabs.tabCloseRequested.connect(self.remove_editor_tab)
+        self.editors_tabs.tabCloseRequested.connect(self.tab_close_requested)
         self.editors_tabs.currentChanged.connect(self.editor_tab_changed)
+        self.editors_tabs.set_master_requested.connect(self.set_master_requested)
 
         helper = QWidget()
         helper.setLayout(QVBoxLayout())
@@ -240,6 +244,16 @@ class MainWindow(QMainWindow):
         QTimer.singleShot(10, self.finish_config)
 
 
+    def set_master_requested(self, widget):
+        if self.master_widget is widget:
+            self.master_widget = None
+        else:
+            self.master_widget = widget
+
+        self.editors_tabs.set_master(self.master_widget)
+
+        print("Master widget set to:", self.master_widget)
+
     def toggle_split_view_mode(self):
         self.editors_tabs.toggle_orientation()
 
@@ -291,7 +305,10 @@ class MainWindow(QMainWindow):
     def file_clicked(self, path):
         editor = EditorWidget(self.get_editor(), self.console_widget, self.config)
         editor.file_modified.connect(self.file_modified)
+        editor.execute_called.connect(self.execute_called)
+
         editor.load_program(path, self.show_all_code_action.isChecked())
+
         self.editors_tabs.addTab(editor, os.path.basename(path))
         editor.set_dark_mode(self.cfg_dark.get_value() == 1)
         self.editors_tabs.setCurrentWidget(editor)
@@ -301,6 +318,19 @@ class MainWindow(QMainWindow):
         if self.config.edit(min_width=400, min_height=400):
             self.config.save("spiceditor.yaml")
             self.apply_config()
+
+    def execute_called(self, editor_widget):
+        for editor in range(self.editors_tabs.count()): #type: EditorWidget
+            editor = self.editors_tabs.widget(editor)
+            if editor.on_disk():
+                editor.save_program(None, False)
+                print("Saved", editor.path)
+
+        if self.master_widget is not None:
+            self.master_widget.run_code()
+        else:
+            editor_widget.run_code()
+
 
     def apply_config(self):
 
@@ -340,11 +370,10 @@ class MainWindow(QMainWindow):
         editor = PythonEditor(PythonHighlighter())
         return editor
 
-    def remove_editor_tab(self, index):
-        if index > 0:
-            self.editors_tabs.removeTab(index)
-        else:
-            self.editors_tabs.widget(0).clear()
+    def tab_close_requested(self, index):
+        widget = self.editors_tabs.widget(index)
+        if widget is self.master_widget:
+            self.set_master_requested(None)
 
     def file_modified(self, widget, value):
         idx = self.editors_tabs.indexOf(widget)
@@ -358,6 +387,7 @@ class MainWindow(QMainWindow):
     def new_editor_tab(self, console):
         editor = EditorWidget(self.get_editor(), console, self.config)
         editor.file_modified.connect(self.file_modified)
+        editor.execute_called.connect(self.execute_called)
 
         self.editors_tabs.addTab(editor, "Code")
         editor.set_dark_mode(self.cfg_dark.get_value() == 1)
@@ -367,6 +397,7 @@ class MainWindow(QMainWindow):
     def new_editor_tab2(self, console):
         editor = EditorWidget(self.get_editor(), console, self.config)
         editor.file_modified.connect(self.file_modified)
+        editor.execute_called.connect(self.execute_called)
 
         self.editors_tabs.addTab(editor, "Code", 1)
         editor.set_dark_mode(self.cfg_dark.get_value() == 1)

@@ -92,6 +92,7 @@ class SilentRichJupyterWidget(RichJupyterWidget):
         return super().eventFilter(watched, event)
 
 
+# noinspection PyProtectedMember
 class JupyterConsole(SpiceConsole):
 
 
@@ -154,62 +155,34 @@ class JupyterConsole(SpiceConsole):
             self.jupyter_widget.set_default_style(colors='lightbg')
 
     def execute(self, code, clear=True):
-        #        self.jupyter_widget._control: QPlainTextEdit
-        # self.jupyter_widget._control.setText("")
-        # def filtering():
-        #     text = self.editor.toPlainText()
-        #     if text.endswith("   ...: "):
-        #         if clear:
-        #             self.editor.clear()
-        #
-        #     # pattern = r"In \[\d+\]:"
-        #     # if re.search(pattern, text[-10:]):
-        #     #     self.timer.stop()
-        #     #     self.timer.start(250)
-        #
-        # self.editor.textChanged.connect(filtering)
-        # # self.jupyter_widget._control.setFocus()
-        # if "input" in code:
-        #     self.jupyter_widget._control.setFocus()
-        # QApplication.processEvents()
-
         def run():
             if code.strip():
-                code_reset = code
-                self.jupyter_widget.execute(code_reset, interactive=True)
+                self.jupyter_widget.execute(code, interactive=True)
                 if clear:
                     self.jupyter_widget._control.clear()
 
-        clearer = '''
-        %reset -f
-        import sys
-        
-        keep_prefixes = (
-            'jupyter', 'ipython', 'ipykernel', 'IPython',
-            'zmq', 'tornado', '_', 'warnings', 'builtins',
-            'sys', 'importlib', 'abc', 'io', 'os', 'types',
-            'typing', 'functools', 'collections', 'threading',
-            'traceback', 'inspect', 'weakref', 'enum', 'signal',
-            'logging', 'pathlib', 're', 'codecs', 'encodings',
-            'ast', 'dis', 'opcode', 'token', 'tokenize',
-        )
-        
-        mods_to_remove = [
-            m for m in sys.modules
-            if not any(m == p or m.startswith(p + '.') or m.startswith(p) for p in keep_prefixes)
-        ]
-        
-        for m in mods_to_remove:
-            del sys.modules[m]
-        
-        
-        '''
 
         # check if kernel is busy, in that case interrupt it to avoid stuck state
         if self.jupyter_widget.kernel_client.is_alive() and self.jupyter_widget._executing:
             self.jupyter_widget.interrupt_kernel()
 
-        self.jupyter_widget.execute(clearer, hidden=True)
+        clear_modules='''
+        %reset -f
+        import os
+        import sys
+        cwd = os.getcwd()
+        deleting = []
+        for k,v in sys.modules.items():
+            try:
+                if cwd in v.__file__:
+                    deleting.append(k)
+            except:
+                pass
+        for k in deleting:
+            del sys.modules[k]
+        '''
+
+        self.jupyter_widget.execute(clear_modules, hidden=True)
         QTimer.singleShot(100, run)
 
     def clear(self):

@@ -74,6 +74,10 @@ class SpiceMagicEditor(CollabPlainTextEdit):
         shortcut = QShortcut(QKeySequence("Ctrl+/"), self)
         shortcut.activated.connect(self.toggle_comment)
 
+    def set_line_number_area_color(self, color):
+        self.line_number_area_color = color
+        self.line_number_area2.update()
+
     def toggle_comment(self):
         cursor = self.textCursor()
         start = cursor.selectionStart()
@@ -418,7 +422,6 @@ class SpiceMagicEditor(CollabPlainTextEdit):
                     self.candidates.append(words_before_cursos[-1])
                 self.suggestion = words_before_cursos[-1]
 
-        print("CANDIDATES:", self.candidates)
         if len(self.candidates) > 1:
 
             # Remove the current suggestion
@@ -427,7 +430,6 @@ class SpiceMagicEditor(CollabPlainTextEdit):
 
             self.suggestion = self.candidates.pop(0)
             self.candidates.append(self.suggestion)
-            print("Suggestion:", self.suggestion)
             self.insertPlainText(self.suggestion)
         else:
             self.insertPlainText("    ")

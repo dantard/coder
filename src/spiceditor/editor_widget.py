@@ -2,7 +2,7 @@ import os
 import re
 
 from PyQt5.QtCore import Qt, QEvent, QFileSystemWatcher, QTimer, pyqtSignal
-from PyQt5.QtGui import QFont, QIcon, QTextCursor, QKeyEvent
+from PyQt5.QtGui import QFont, QIcon, QTextCursor, QKeyEvent, QColor
 from PyQt5.QtWidgets import QVBoxLayout, QToolBar, QStatusBar, QWidget, QComboBox, QShortcut, QTabWidget, QFileDialog, \
     QApplication, QDialog, QMessageBox, QLabel, QHBoxLayout, QPushButton, QSizePolicy
 
@@ -69,9 +69,11 @@ class MyStatusBar(QStatusBar):
 class EditorWidget(QWidget):
     file_modified = pyqtSignal(object, bool)
     focus_in = pyqtSignal(object)
+    execute_called = pyqtSignal(object)
 
     def __init__(self, language_editor, console, config):
         super().__init__()
+        self.master = False
         self.automatic_reload = False
         self.path = None
         self.config = config
@@ -140,6 +142,13 @@ class EditorWidget(QWidget):
     def is_modified(self):
         return self.modified
 
+    def set_master(self, master):
+        self.master = master
+
+
+    def is_master(self):
+        return self.master
+
     def on_file_changed(self, path):
 
         if self.automatic_reload:
@@ -196,6 +205,9 @@ class EditorWidget(QWidget):
         if show_all:
             self.show_all_code()
 
+    def on_disk(self):
+        return self.path is not None and os.path.exists(self.path)
+
     def save_program(self, path, save_as):
         if self.path is None or save_as:
             ext = self.console.get_file_extension()
@@ -235,7 +247,12 @@ class EditorWidget(QWidget):
             s
         )
 
+    # this goes to main_window that decides if this code
+    # actually runs (run_code) or the main program must run
     def execute_code(self):
+        self.execute_called.emit(self)
+
+    def run_code(self):
         self.language_editor.setFocus()
         if self.config.root().get_child("format_code_before_run").get_value():
             self.language_editor.format_code()
