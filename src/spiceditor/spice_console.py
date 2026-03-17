@@ -158,8 +158,8 @@ class JupyterConsole(SpiceConsole):
         def run():
             if code.strip():
                 self.jupyter_widget.execute(code, interactive=True)
-                if clear:
-                    self.jupyter_widget._control.clear()
+                #if clear:
+                #    self.jupyter_widget._control.clear()
 
 
         # check if kernel is busy, in that case interrupt it to avoid stuck state

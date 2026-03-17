@@ -324,7 +324,6 @@ class MainWindow(QMainWindow):
             editor = self.editors_tabs.widget(editor)
             if editor.on_disk():
                 editor.save_program(None, False)
-                print("Saved", editor.path)
 
         if self.master_widget is not None:
             self.master_widget.run_code()

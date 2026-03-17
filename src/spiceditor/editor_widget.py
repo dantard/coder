@@ -211,13 +211,19 @@ class EditorWidget(QWidget):
     def save_program(self, path, save_as):
         if self.path is None or save_as:
             ext = self.console.get_file_extension()
-            filename, ok = QFileDialog.getSaveFileName(self, "Save code", filter="Language files (*" + ext + ")",
-                                                       directory=path)
+            filename, selected_filter = QFileDialog.getSaveFileName(self, "Save code", directory=path,
+                                                       filter="Language files (*" + ext + ");;CSV files (*.csv);;YAML files (*.yaml *.yml)")
             if not filename:
                 return
             if len(self.file_watcher.files()) > 0:
                 self.file_watcher.removePaths(self.file_watcher.files())
-            self.path = filename.replace(".py", "") + ".py"
+            if "py" in selected_filter:
+                self.path = filename.replace(".py", "") + ".py"
+            elif "csv" in selected_filter:
+                self.path = filename.replace(".csv", "") + ".csv"
+            elif "yaml" in selected_filter:
+                self.path = filename.replace(".yaml", "").replace(".yml", "") + ".yaml"
+
             self.file_watcher.addPath(self.path)
             self.file_modified.emit(self, False)
 
