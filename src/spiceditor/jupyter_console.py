@@ -82,7 +82,7 @@ class JupyterConsole(SpiceConsole):
         def run():
             if code.strip():
                 self.jupyter_widget.set_echo(False)
-                self.jupyter_widget.execute(code, interactive=True)
+                self.jupyter_widget.execute(code, interactive=False)
                 self.jupyter_widget.set_echo(True)
                 # if clear:
                 #    self.jupyter_widget._control.clear()

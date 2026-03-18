@@ -1,3 +1,5 @@
+import sys
+
 from PyQt5.QtCore import pyqtSignal, Qt, QEvent
 from PyQt5.QtWidgets import QSplitter, QTabWidget, QTabBar, QMenu, QPushButton, QWidget, QHBoxLayout, QLabel
 
@@ -47,13 +49,14 @@ class MyTabWidget(QTabWidget):
 
     def move_plus_button(self):
         xpos = 0
+        ypos = 5 if sys.platform == "linux" else 2
         for i in range(self.tabBar().count()):
             rect = self.tabBar().tabRect(i)
             xpos += rect.width()
         if self.orientation == QTabWidget.North:
-            self.plus_button.setGeometry(xpos + 5, 5, 20, 20)
+            self.plus_button.setGeometry(xpos + 2, ypos, 20, 20)
         else:
-            self.plus_button.setGeometry(xpos + 5, self.height() - 25, 20, 20)
+            self.plus_button.setGeometry(xpos + 2, self.height() - (20 + ypos), 20, 20)
 
         if xpos > self.width() - 35:
             self.plus_button.hide()
@@ -61,6 +64,10 @@ class MyTabWidget(QTabWidget):
         else:
             self.plus_button.show()
             self.cornerWidget().hide()
+
+    def removeTab(self, index):
+        super().removeTab(index)
+        self.move_plus_button()
 
 
 class DoubleClickTabBar(QTabBar):
@@ -144,6 +151,8 @@ class DoubleTabWidget(QSplitter):
         self.right.removeTab(index)
         if self.right.count() == 0:
             self.right.hide()
+
+
 
     def indexOf(self, w):
         index = self.left.indexOf(w)
