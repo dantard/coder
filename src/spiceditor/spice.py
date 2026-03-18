@@ -2,8 +2,8 @@ import sys
 
 from PyQt5.QtWidgets import QApplication
 
+from spiceditor.jupyter_console import JupyterConsole
 from spiceditor.main_window import MainWindow
-from spiceditor.spice_console import JupyterConsole
 
 
 def main():

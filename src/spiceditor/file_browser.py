@@ -5,7 +5,8 @@ import sys
 
 from PyQt5 import QtGui
 from PyQt5.QtCore import QObject, pyqtSignal, QDir, QItemSelectionModel, QModelIndex, Qt, QTimer
-from PyQt5.QtWidgets import QWidget, QTreeView, QFileSystemModel, QVBoxLayout, QPushButton, QHBoxLayout, QLabel, QMenu, QMessageBox, QToolBar, QInputDialog
+from PyQt5.QtWidgets import QWidget, QTreeView, QFileSystemModel, QVBoxLayout, QPushButton, QHBoxLayout, QLabel, QMenu, \
+    QMessageBox, QToolBar, QInputDialog, QFileDialog
 
 
 class Tree(QTreeView):
@@ -41,9 +42,15 @@ class Tree(QTreeView):
                 path = dirModel.fileInfo(index).absoluteFilePath()
                 menu = QMenu()
                 delete = menu.addAction("Delete")
+                move = menu.addAction("Move")
                 res = menu.exec_(self.viewport().mapToGlobal(a0.pos()))
                 if res == delete:
                     self.delete_requested.emit(path)
+                elif res == move:
+                    new_path = QFileDialog.getExistingDirectory(self, "Select Directory", os.path.dirname(path))
+                    if new_path:
+                        shutil.move(path, new_path)
+
 
 class FileSystemModelWithTooltip(QFileSystemModel):
     def data(self, index, role=Qt.DisplayRole):
@@ -64,8 +71,8 @@ class FileBrowser(QWidget):
         self.treeview = Tree()
         self.treeview.delete_requested.connect(self.delete_requested)
         self.dirModel = FileSystemModelWithTooltip()
-        self.dirModel.directoryLoaded.connect(lambda:self.treeview.filter_rows(filters))
-        #self.dirModel.setNameFilters(filters)
+        self.dirModel.directoryLoaded.connect(lambda: self.treeview.filter_rows(filters))
+        # self.dirModel.setNameFilters(filters)
         self.dirModel.setNameFilterDisables(False)
 
         self.treeview.setModel(self.dirModel)
@@ -75,10 +82,10 @@ class FileBrowser(QWidget):
         vlayout.setSpacing(0)
         vlayout.setContentsMargins(0, 0, 0, 0)
         self.setLayout(vlayout)
-        #tb = QToolBar()
-        #tb.addAction("🗀", self.refresh)
+        # tb = QToolBar()
+        # tb.addAction("🗀", self.refresh)
 
-        #vlayout.addWidget(tb)
+        # vlayout.addWidget(tb)
         self.layout().addWidget(self.treeview)
         self.treeview.selectionModel().selectionChanged.connect(self.on_current_changed)
         self.treeview.doubleClicked.connect(self.on_double_clicked)
@@ -88,15 +95,13 @@ class FileBrowser(QWidget):
                 self.treeview.header().hideSection(i)
 
     def delete_requested(self, path):
-        if QMessageBox.question(self, "Delete", f"Are you sure you want to delete {path}?", QMessageBox.Yes | QMessageBox.No) == QMessageBox.No:
+        if QMessageBox.question(self, "Delete", f"Are you sure you want to delete {path}?",
+                                QMessageBox.Yes | QMessageBox.No) == QMessageBox.No:
             return
         if os.path.isdir(path):
             shutil.rmtree(path)
         else:
             os.remove(path)
-
-
-
 
     def on_double_clicked(self, index):
         # Map the proxy index to the source model index
@@ -126,7 +131,7 @@ class FileBrowser(QWidget):
         if not os.path.exists(path):
             return
         self.treeview.setRootIndex(self.dirModel.setRootPath(path))
-        self.current_files = [str(x) for  x in os.listdir(path)]
+        self.current_files = [str(x) for x in os.listdir(path)]
 
     def set_root_index(self, index):
         self.treeview.setRootIndex(index)
@@ -166,13 +171,25 @@ class FileBrowser(QWidget):
         #     self.signals.file_selected.emit(path)
 
     def new_folder(self):
-        current_path = self.dirModel.rootPath()
+        # if a directory is selected in the tree, create a new folder inside it, otherwise create a new folder in the
+        # current directory
 
+        current_path = self.path
+        selected_indexes = self.treeview.selectionModel().selectedIndexes()
+        if selected_indexes:
+            selected_index = selected_indexes[0]
+            selected_path = self.dirModel.fileInfo(selected_index).absoluteFilePath()
+            if os.path.isdir(selected_path):
+                current_path = selected_path
+        print(current_path)
         # If the toolbar refresh button was clicked with no arguments,
         # show the folder creation dialog
         folder_name, ok = QInputDialog.getText(self, "Folder Name", "Enter the folder name")
         if ok and folder_name:
-            new_folder_path = os.path.join(self.path, folder_name)
+            new_folder_path = os.path.join(current_path, folder_name)
             os.makedirs(new_folder_path, exist_ok=True)
             self.dirModel.setRootPath("")
-            self.dirModel.setRootPath(current_path)
+            self.dirModel.setRootPath(self.path)
+
+    def get_path(self):
+        return self.path

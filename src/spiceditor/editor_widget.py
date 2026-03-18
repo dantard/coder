@@ -9,7 +9,6 @@ from PyQt5.QtWidgets import QVBoxLayout, QToolBar, QStatusBar, QWidget, QComboBo
 from spiceditor import utils
 
 import spiceditor.resources  # noqa
-from spiceditor.spice_console import JupyterConsole
 
 
 class MyStatusBar(QStatusBar):
@@ -195,9 +194,7 @@ class EditorWidget(QWidget):
             self.language_editor.set_code(f.read())
             self.console.clear()
             if len(self.file_watcher.files()) > 0:
-                print("Removing paths from file watcher", self.file_watcher.files())
                 self.file_watcher.removePaths(self.file_watcher.files())
-            print("Adding path to file watcher", path)
             self.file_watcher.addPath(path)
             self.file_modified.emit(self, False)
             self.modified_internally = False

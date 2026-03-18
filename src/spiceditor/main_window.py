@@ -14,8 +14,9 @@ from spiceditor.double_tab_widget import DoubleTabWidget
 from spiceditor.editor_widget import EditorWidget
 from spiceditor.file_browser import FileBrowser
 from spiceditor.highlighter import PythonHighlighter, PascalHighlighter
+from spiceditor.jupyter_console import JupyterConsole
 from spiceditor.spice_magic_editor import PythonEditor, PascalEditor
-from spiceditor.spice_console import JupyterConsole, TermQtConsole
+from spiceditor.spice_console import TermQtConsole
 from spiceditor.textract import Slides
 import argparse
 
@@ -126,6 +127,7 @@ class MainWindow(QMainWindow):
         self.editors_tabs.tabCloseRequested.connect(self.tab_close_requested)
         self.editors_tabs.currentChanged.connect(self.editor_tab_changed)
         self.editors_tabs.set_master_requested.connect(self.set_master_requested)
+        self.editors_tabs.new_tab_requested.connect(lambda index: self.new_editor_tab(self.console_widget, index))
 
         helper = QWidget()
         helper.setLayout(QVBoxLayout())
@@ -303,6 +305,12 @@ class MainWindow(QMainWindow):
         self.editors_tabs.currentWidget().save_program(self.cfg_progs_path.get_value(), True)
 
     def file_clicked(self, path):
+        for i in range(self.editors_tabs.count()):
+            widget = self.editors_tabs.widget(i)
+            if widget.path == path:
+                self.editors_tabs.setCurrentWidget(widget)
+                return
+
         editor = EditorWidget(self.get_editor(), self.console_widget, self.config)
         editor.file_modified.connect(self.file_modified)
         editor.execute_called.connect(self.execute_called)
@@ -383,12 +391,12 @@ class MainWindow(QMainWindow):
         title = title + "*" if value else title
         self.editors_tabs.setTabText(idx, title)
 
-    def new_editor_tab(self, console):
+    def new_editor_tab(self, console, index=0):
         editor = EditorWidget(self.get_editor(), console, self.config)
         editor.file_modified.connect(self.file_modified)
         editor.execute_called.connect(self.execute_called)
 
-        self.editors_tabs.addTab(editor, "Code")
+        self.editors_tabs.addTab(editor, "Code", index)
         editor.set_dark_mode(self.cfg_dark.get_value() == 1)
         self.editors_tabs.setCurrentWidget(editor)
         self.apply_config()
