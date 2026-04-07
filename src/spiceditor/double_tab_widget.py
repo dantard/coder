@@ -2,6 +2,7 @@ import sys
 
 from PyQt5.QtCore import pyqtSignal, Qt, QEvent
 from PyQt5.QtWidgets import QSplitter, QTabWidget, QTabBar, QMenu, QPushButton, QWidget, QHBoxLayout, QLabel
+from pyqtgraph.examples.MultiDataPlot import widget
 
 
 class PlusButton(QWidget):
@@ -81,6 +82,10 @@ class DoubleClickTabBar(QTabBar):
         super().mouseDoubleClickEvent(event)
 
     def contextMenuEvent(self, a0):
+        index = self.tabAt(a0.pos())
+        widget = self.parent().widget(index)
+        if not widget.is_selectable():
+            return
         menu = QMenu()
         sam = menu.addAction("Toggle Master")
         result = menu.exec(a0.globalPos())
@@ -215,6 +220,10 @@ class DoubleTabWidget(QSplitter):
             return
         if widget is None:
             widget = self.left.currentWidget()
+
+        if not widget.is_selectable():
+            return
+
         self.current_widget = widget
         for i in range(self.left.count()):
             self.left.tabBar().setTabTextColor(i, Qt.black)

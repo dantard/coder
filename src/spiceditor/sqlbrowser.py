@@ -303,7 +303,9 @@ class SQLiteBrowser(QWidget):
         browser.open_database("mydb.sqlite")
         layout.addWidget(browser)
     """
-
+    file_modified = pyqtSignal(object, bool)
+    focus_in = pyqtSignal(object)
+    execute_called = pyqtSignal(object)
     db_opened = pyqtSignal(str)  # emitted with path when a database is opened
 
     def __init__(self, db_path=None, parent=None):
@@ -332,7 +334,11 @@ class SQLiteBrowser(QWidget):
             self.open_database(db_path)
 
     # ── UI construction ───────────────────────────────────────────────────────
+    def set_dark_mode(self, dark):
+        pass
 
+    def update_config(self):
+        pass
     def _setup_ui(self):
         self._font_size = 10
         self._mono_font = QFont("Courier New", self._font_size)
@@ -555,12 +561,15 @@ class SQLiteBrowser(QWidget):
         self.data_table.customContextMenuRequested.connect(self._rows_context_menu)
         self.filter_edit.textChanged.connect(self._apply_filter)
 
-        QShortcut(QKeySequence("Ctrl+Return"), self, self.run_query)
-        QShortcut(QKeySequence("Ctrl+Enter"),  self, self.run_query)
+        #QShortcut(QKeySequence("Ctrl+Return"), self, self.run_query)
+        QShortcut(QKeySequence("Ctrl+Shift+Enter"),  self, self.run_query)
         QShortcut(QKeySequence("Ctrl+="),      self, lambda: self._change_font_size(+1))
         QShortcut(QKeySequence("Ctrl++"),      self, lambda: self._change_font_size(+1))
         QShortcut(QKeySequence("Ctrl+-"),      self, lambda: self._change_font_size(-1))
         self._resize_buttons()
+
+    def execute_code(self):
+        pass
 
     def _on_snippet_selected(self, index):
         if index <= 0:
@@ -606,6 +615,7 @@ class SQLiteBrowser(QWidget):
             QMessageBox.critical(self, "Error", f"Cannot open database:\n{e}")
             return
         self.db_path = path
+        self.path = path
         self.db_opened.emit(path)
         # Watch the file for external changes
         if self._watcher.files():
@@ -613,6 +623,14 @@ class SQLiteBrowser(QWidget):
         self._watcher.addPath(path)
         self.refresh()
         self._set_status(f"Opened: {path}")
+    def on_disk(self):
+        return True
+
+    def save_program(self, a=None,b=None):
+        pass
+
+    def is_selectable(self):
+        return False
 
     def new_database(self):
         path, _ = QFileDialog.getSaveFileName(

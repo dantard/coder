@@ -18,7 +18,7 @@ class Tree(QTreeView):
 
     def filter_rows(self, extensions=None):
 
-        extensions = extensions or [".txt", ".py", ".csv"]
+        extensions = extensions or [".txt", ".py", ".csv", ".yaml", ".json", ".sqlite", ".db"]
 
         for i in range(self.model().rowCount(self.rootIndex())):
             child_index = self.model().index(i, 0, self.rootIndex())  # Get index of each row
@@ -29,6 +29,7 @@ class Tree(QTreeView):
                     self.setRowHidden(i, self.rootIndex(), True)
             else:
                 extension = os.path.splitext(filename)[1]
+                print(filename, extension)
                 if extension not in extensions:
                     self.setRowHidden(i, self.rootIndex(), True)
 
@@ -110,7 +111,7 @@ class FileBrowser(QWidget):
             return
         if os.path.isfile(path):
             extension = os.path.splitext(path)[1]
-            if extension in [".txt", ".py", ".csv", ".yaml", ".json"]:
+            if extension in [".txt", ".py", ".csv", ".yaml", ".json", ".sqlite", ".db"]:
                 self.signals.file_selected.emit(path)
             else:
                 # open with default application

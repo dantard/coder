@@ -53,8 +53,9 @@ class MyStatusBar(QStatusBar):
             self.insertPermanentWidget(1, button)
             self.buttons.append(button)
 
-        if msecs > 0:
+        if msecs >= 0:
             self.timer.stop()
+        if msecs > 0:
             self.timer.start(msecs)
 
     def reset(self):
@@ -204,12 +205,13 @@ class EditorWidget(QWidget):
 
     def on_disk(self):
         return self.path is not None and os.path.exists(self.path)
-
+    def is_selectable(self):
+        return self.on_disk() == False or self.path.endswith(".py")
     def save_program(self, path, save_as):
         if self.path is None or save_as:
             ext = self.console.get_file_extension()
             filename, selected_filter = QFileDialog.getSaveFileName(self, "Save code", directory=path,
-                                                       filter="Language files (*" + ext + ");;CSV files (*.csv);;YAML files (*.yaml *.yml)")
+                                                       filter="Language files (*" + ext + ");;CSV files (*.csv);;YAML files (*.yaml *.yml);; TXT files (*.txt);; All files (*.*)")
             if not filename:
                 return
             if len(self.file_watcher.files()) > 0:
@@ -220,6 +222,8 @@ class EditorWidget(QWidget):
                 self.path = filename.replace(".csv", "") + ".csv"
             elif "yaml" in selected_filter:
                 self.path = filename.replace(".yaml", "").replace(".yml", "") + ".yaml"
+            elif "txt" in selected_filter:
+                self.path = filename.replace(".txt", "") + ".txt"
 
             self.file_watcher.addPath(self.path)
             self.file_modified.emit(self, False)

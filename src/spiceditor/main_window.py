@@ -6,7 +6,7 @@ from PyQt5.QtGui import QIcon, QKeyEvent
 from PyQt5.QtWidgets import QApplication, QMainWindow, QSplitter, QPushButton, QVBoxLayout, QWidget, \
     QTabWidget, QFileDialog, QShortcut, QTabBar, QMessageBox, QToolBar, QDialog
 from easyconfig2.easyconfig import EasyConfig2 as EasyConfig
-
+import sqlite3
 import spiceditor.resources  # noqa
 from spiceditor.bw_timer import CountdownTimer
 from spiceditor.dialogs import Author, ConnectionDialog
@@ -17,6 +17,7 @@ from spiceditor.highlighter import PythonHighlighter, PascalHighlighter
 from spiceditor.jupyter_console import JupyterConsole
 from spiceditor.spice_magic_editor import PythonEditor, PascalEditor
 from spiceditor.spice_console import TermQtConsole
+from spiceditor.sqlbrowser import SQLiteBrowser
 from spiceditor.textract import Slides
 import argparse
 
@@ -136,7 +137,7 @@ class MainWindow(QMainWindow):
         helper.layout().setContentsMargins(0,5,0,0)
         helper.layout().setSpacing(0)
 
-        self.file_browser = FileBrowser(self.cfg_progs_path.get_value(), filters=[".py", ".csv", ".txt", ".yaml"], )
+        self.file_browser = FileBrowser(self.cfg_progs_path.get_value(), filters=[".py", ".csv", ".txt", ".yaml", ".db", ".sqlite"], )
         self.file_browser.signals.file_selected.connect(self.file_clicked)
         self.splitter = QSplitter(Qt.Horizontal)
 
@@ -173,6 +174,7 @@ class MainWindow(QMainWindow):
         m1 = file.addMenu("Slides")
         file.addSeparator()
         file.addAction("Connect", self.connect_to_host)
+        file.addAction("Create Database", self.open_db_browser)
         file.addAction("Exit", self.close)
         m4 = menu.addMenu("Timer")
         m4.addAction("5 min", lambda: self.create_timer(minutes=5))
@@ -245,6 +247,19 @@ class MainWindow(QMainWindow):
 
         QTimer.singleShot(10, self.finish_config)
 
+    def open_db_browser(self):
+        path = QFileDialog.getSaveFileName(self, "Create SQLite Database", filter="SQLite files (*.sqlite);;All files (*.*)", directory=self.cfg_progs_path.get_value())[0]
+        try:
+            conn = sqlite3.connect(path)
+            conn.close()
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Cannot create database:\n{e}")
+            return
+
+
+        #widget = SQLiteBrowser()
+        #self.editors_tabs.addTab(widget, "Browser")
+
 
     def set_master_requested(self, widget):
         if self.master_widget is widget:
@@ -311,13 +326,16 @@ class MainWindow(QMainWindow):
                 self.editors_tabs.setCurrentWidget(widget)
                 return
 
-        editor = EditorWidget(self.get_editor(), self.console_widget, self.config)
-        editor.file_modified.connect(self.file_modified)
-        editor.execute_called.connect(self.execute_called)
+        if ".db" in path or ".sqlite" in path:
+            editor = SQLiteBrowser(path)
+            self.editors_tabs.addTab(editor, "DBrowser")
+        else:
+            editor = EditorWidget(self.get_editor(), self.console_widget, self.config)
+            editor.file_modified.connect(self.file_modified)
+            editor.execute_called.connect(self.execute_called)
+            editor.load_program(path, self.show_all_code_action.isChecked())
+            self.editors_tabs.addTab(editor, os.path.basename(path))
 
-        editor.load_program(path, self.show_all_code_action.isChecked())
-
-        self.editors_tabs.addTab(editor, os.path.basename(path))
         editor.set_dark_mode(self.cfg_dark.get_value() == 1)
         self.editors_tabs.setCurrentWidget(editor)
         self.apply_config()
@@ -400,6 +418,7 @@ class MainWindow(QMainWindow):
         editor.set_dark_mode(self.cfg_dark.get_value() == 1)
         self.editors_tabs.setCurrentWidget(editor)
         self.apply_config()
+        return editor
 
     def new_editor_tab2(self, console):
         editor = EditorWidget(self.get_editor(), console, self.config)
@@ -530,12 +549,13 @@ class MainWindow(QMainWindow):
         self.cfg_open_fullscreen.set_value(self.isFullScreen())
 
     def code_from_slide(self, code):
-        editor = self.editors_tabs.currentWidget()
-
-        editor.language_editor.set_text("")
         if QApplication.keyboardModifiers() == Qt.ControlModifier:
+            editor = self.editors_tabs.currentWidget()
+            if not isinstance(editor, EditorWidget):
+                return
             editor.language_editor.set_code(editor.language_editor.code + "\n" + code)
         else:
+            editor = self.new_editor_tab(self.console_widget)
             editor.language_editor.set_code(code)
 
         editor.language_editor.set_mode(1)
