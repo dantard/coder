@@ -99,6 +99,7 @@ class MainWindow(QMainWindow):
         self.slides_tabs.tabBar().setTabButton(0, QTabBar.ButtonPosition.RightSide, None)
         self.slides_tabs.tabBarDoubleClicked.connect(self.slide_tab_double_clicked)
         self.console_widget = console(self.config)
+        self.console_widget.setContentsMargins(0, 0, 0, 0)
 
         self.base_editor = EditorWidget(self.get_editor(), self.console_widget, self.config)
         self.base_editor.file_modified.connect(self.file_modified)
@@ -149,14 +150,23 @@ class MainWindow(QMainWindow):
         self.splitter.addWidget(helper)
         ### TODO: new
         self.slides_helper = QWidget()
+        self.slides_helper.setContentsMargins(0, 0, 0, 0)
         self.slides_helper.setLayout(QVBoxLayout())
         self.slides_helper.layout().setContentsMargins(0, 0, 0, 0)
         self.slides_helper.layout().addWidget(self.console_widget)
-        self.back_to_tabs_btn = QPushButton("Back to tabs")
-        self.back_to_tabs_btn.clicked.connect(self.back_to_tabs)
-        self.back_to_tabs_btn.setVisible(False)
-        self.slides_helper.layout().addWidget(self.back_to_tabs_btn)
-        self.splitter.addWidget(self.slides_helper)
+        # self.back_to_tabs_btn = QPushButton("x")
+        # self.back_to_tabs_btn.clicked.connect(self.back_to_tabs)
+        # self.back_to_tabs_btn.setFixedSize(20, 20)
+        # self.back_to_tabs_btn.setVisible(False)
+        # self.slides_helper.layout().addWidget(self.back_to_tabs_btn)
+        self.tb = QToolBar()
+        self.tb.setVisible(False)
+        self.slides_helper.layout().addWidget(self.tb)
+        self.tb.addAction("←", self.back_to_tabs)
+        self.sp1 = QSplitter(Qt.Vertical)
+        self.sp1.addWidget(self.slides_helper)
+        self.splitter.addWidget(self.sp1)
+        self.splitter.setContentsMargins(0, 0, 0, 0)
 
 
     ### TODO: old
@@ -195,7 +205,7 @@ class MainWindow(QMainWindow):
             path = self.cfg_slides_path.get_value() + os.sep
             if not os.path.exists(path):
                 return
-            for filename in os.listdir(path):
+            for filename in [x for x in os.listdir(path) if x.endswith(".pdf")]:
                 m1.addAction(filename, lambda x=filename, y=filename: self.open_slides(path + y))
 
         m1.aboutToShow.connect(fill)
@@ -595,21 +605,21 @@ class MainWindow(QMainWindow):
         editor.show_all_code()
 
     def back_to_tabs(self):
-        slides = self.slides_helper.layout().itemAt(2).widget()
+        slides = self.sp1.widget(1)
         print("Back to tabs:", slides)
         self.slides_tabs.addTab(slides, slides.filename)
         self.slides_tabs.setCurrentWidget(slides)
         slides.view.setFocus()
-        self.back_to_tabs_btn.setVisible(False)
+        self.tb.setVisible(False)
 
 
     def slide_tab_double_clicked(self, index):
         if index == 0:
             return
-        if self.slides_helper.layout().count() > 2:
+        if self.sp1.count() > 1:
             self.back_to_tabs()
         widget = self.slides_tabs.widget(index)
-        self.slides_helper.layout().addWidget(widget)
-        self.back_to_tabs_btn.setVisible(True)
+        self.sp1.addWidget(widget)
+        self.tb.setVisible(True)
         widget.show()
         self.slides_tabs.setCurrentIndex(0)
