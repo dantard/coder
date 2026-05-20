@@ -129,7 +129,6 @@ class TermQtConsole(SpiceConsole):
     def config_read(self):
         super().config_read()
 
-        print("config read")
         init = self.init.get_value()
         if init is not None:
             init += "\n"

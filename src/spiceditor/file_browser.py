@@ -29,7 +29,6 @@ class Tree(QTreeView):
                     self.setRowHidden(i, self.rootIndex(), True)
             else:
                 extension = os.path.splitext(filename)[1]
-                print(filename, extension)
                 if extension not in extensions:
                     self.setRowHidden(i, self.rootIndex(), True)
 
@@ -63,6 +62,7 @@ class FileSystemModelWithTooltip(QFileSystemModel):
 class FileBrowser(QWidget):
     class Signals(QObject):
         file_selected = pyqtSignal(str)
+        directory_changed = pyqtSignal(str)
 
     def __init__(self, path, filters=None, hide_details=True):
         super().__init__()
@@ -87,6 +87,15 @@ class FileBrowser(QWidget):
         # tb.addAction("🗀", self.refresh)
 
         # vlayout.addWidget(tb)
+        self.label = QLabel(path)
+        self.button = QPushButton("...")
+        self.button.setMaximumWidth(20)
+        self.button.setFlat(True)
+        self.button.clicked.connect(self.btn_path_clicked)
+        hb = QHBoxLayout()
+        hb.addWidget(self.label)
+        hb.addWidget(self.button)
+        self.layout().addLayout(hb)
         self.layout().addWidget(self.treeview)
         self.treeview.selectionModel().selectionChanged.connect(self.on_current_changed)
         self.treeview.doubleClicked.connect(self.on_double_clicked)
@@ -103,6 +112,12 @@ class FileBrowser(QWidget):
             shutil.rmtree(path)
         else:
             os.remove(path)
+
+    def btn_path_clicked(self):
+        path = QFileDialog.getExistingDirectory(self, "Select Directory", self.path)
+        if path:
+            self.set_root(path)
+            self.signals.directory_changed.emit(path)
 
     def on_double_clicked(self, index):
         # Map the proxy index to the source model index
@@ -133,6 +148,9 @@ class FileBrowser(QWidget):
             return
         self.treeview.setRootIndex(self.dirModel.setRootPath(path))
         self.current_files = [str(x) for x in os.listdir(path)]
+        self.path = path
+        self.label.setText("..." + path[-20:] if len(path) > 30 else path)
+        self.label.setToolTip(path)
 
     def set_root_index(self, index):
         self.treeview.setRootIndex(index)
@@ -182,7 +200,6 @@ class FileBrowser(QWidget):
             selected_path = self.dirModel.fileInfo(selected_index).absoluteFilePath()
             if os.path.isdir(selected_path):
                 current_path = selected_path
-        print(current_path)
         # If the toolbar refresh button was clicked with no arguments,
         # show the folder creation dialog
         folder_name, ok = QInputDialog.getText(self, "Folder Name", "Enter the folder name")

@@ -253,6 +253,14 @@ class DoubleTabWidget(QSplitter):
     def currentWidget(self):
         return self.current_widget
 
+    def widgets(self):
+        widgets = []
+        for i in range(self.left.count()):
+            widgets.append(self.left.widget(i))
+        for i in range(self.right.count()):
+            widgets.append(self.right.widget(i))
+        return widgets
+
     def widget(self, index):
         if index < self.left.count():
             return self.left.widget(index)

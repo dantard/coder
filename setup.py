@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='spiceditor',
-    version='0.0.20',
+    version='0.0.27',
     packages=find_packages(where='src'),  # Specify src directory
     package_dir={'': 'src'},  # Tell setuptools that packages are under src
     install_requires=[
@@ -15,7 +15,8 @@ setup(
         'easyconfig2',
         'pyshortcuts',
         'pysqlite3',
-        'python_csv'
+        'python_csv',
+        'minimal_sqlite_browser',
     ],
     author='Danilo Tardioli',
     author_email='dantard@unizar.es',

@@ -1,6 +1,6 @@
 import os
 import sys
-
+from spiceditor.drive_pdf_downloader import DrivePdfDownloaderWidget
 from PyQt5.QtCore import Qt, QTimer,QEvent
 from PyQt5.QtGui import QIcon, QKeyEvent
 from PyQt5.QtWidgets import QApplication, QMainWindow, QSplitter, QPushButton, QVBoxLayout, QWidget, \
@@ -17,7 +17,8 @@ from spiceditor.highlighter import PythonHighlighter, PascalHighlighter
 from spiceditor.jupyter_console import JupyterConsole
 from spiceditor.spice_magic_editor import PythonEditor, PascalEditor
 from spiceditor.spice_console import TermQtConsole
-from spiceditor.sqlbrowser import SQLiteBrowser
+from minimal_sql_browser.msb import MiniSqlApp
+#from spiceditor.sqlbrowser import SQLiteBrowser
 from spiceditor.textract import Slides
 import argparse
 
@@ -41,7 +42,7 @@ class MainWindow(QMainWindow):
         args = parser.parse_args()
 
         self.userid = args.userid
-
+        self.script_path = os.path.dirname(os.path.abspath(__file__)) + os.sep
         self.show_iter = 0
         self.sizes = None
         self.master_widget = None
@@ -52,7 +53,7 @@ class MainWindow(QMainWindow):
         self.cfg_open_fullscreen = general.addCheckbox("open_fullscreen",
                                                        pretty="Open Fullscreen",
                                                        default=False)
-
+        self.cfg_remote_folder_id = general.addString("remote_folder_id", pretty="Remote Slides Folder ID", default="")
         self.cfg_font_size = general.addCombobox("font_size", pretty="Font size", items=[str(i) for i in range(10, 65)],
                                                  default=0)
         self.cfg_tb_orintation = general.addCombobox("tb_orientation",
@@ -81,6 +82,8 @@ class MainWindow(QMainWindow):
                                                 default=False)
         self.cfg_click_to_next = general.addCombobox("click_to_next", pretty="Click to go to next slide",
                                                      items=["1", "2", "3"], default=0)
+        self.cfg_override_keys = general.getCheckBox("override_keys", pretty="Override Keys",
+                                                     default=False)
 
         self.dark = False
         self.timers = []
@@ -94,24 +97,8 @@ class MainWindow(QMainWindow):
         self.slides_tabs.tabCloseRequested.connect(self.close_tab_requested)
         self.slides_tabs.currentChanged.connect(self.tab_changed)
         self.slides_tabs.tabBar().setTabButton(0, QTabBar.ButtonPosition.RightSide, None)
+        self.slides_tabs.tabBarDoubleClicked.connect(self.slide_tab_double_clicked)
         self.console_widget = console(self.config)
-
-        if isinstance(self.console_widget, JupyterConsole):
-            # [(key, modifier, action, event^), ...] ^if action is replace otherwise None
-            self.console_widget.jupyter_widget.set_key_override(
-                [(Qt.Key_Up, Qt.NoModifier, "disable", None),
-                 (Qt.Key_Up, Qt.ShiftModifier, "disable", None),
-                 (Qt.Key_Return, Qt.ControlModifier, "run", lambda: self.editors_tabs.currentWidget().execute_code()),
-                 (Qt.Key_Up, Qt.ControlModifier, "replace", QKeyEvent(QEvent.Type.KeyPress,
-                                                                      Qt.Key_Up,
-                                                                      Qt.KeyboardModifier.NoModifier
-                                                                      )),
-                 (Qt.Key_Down, Qt.ControlModifier, "replace", QKeyEvent(QEvent.Type.KeyPress,
-                                                                        Qt.Key_Down,
-                                                                        Qt.KeyboardModifier.NoModifier
-                                                                        ))
-                 ])
-
 
         self.base_editor = EditorWidget(self.get_editor(), self.console_widget, self.config)
         self.base_editor.file_modified.connect(self.file_modified)
@@ -119,7 +106,7 @@ class MainWindow(QMainWindow):
         if args.host:
             self.base_editor.get_editor().start_server(args.userid if args.userid else "host")
 
-        self.config.load("spiceditor.yaml")
+        self.config.load(self.script_path + "spiceditor.yaml")
         self.console_widget.config_read()
 
         self.editors_tabs = DoubleTabWidget(Qt.Vertical if self.cfg_split_view_mode.get_value() == 0 else Qt.Horizontal)
@@ -139,6 +126,8 @@ class MainWindow(QMainWindow):
 
         self.file_browser = FileBrowser(self.cfg_progs_path.get_value(), filters=[".py", ".csv", ".txt", ".yaml", ".db", ".sqlite"], )
         self.file_browser.signals.file_selected.connect(self.file_clicked)
+        self.file_browser.signals.directory_changed.connect(lambda path: self.cfg_progs_path.set_value(path))
+
         self.splitter = QSplitter(Qt.Horizontal)
 
         helper2 = QWidget()
@@ -158,7 +147,21 @@ class MainWindow(QMainWindow):
 
         self.splitter.addWidget(helper2)
         self.splitter.addWidget(helper)
-        self.splitter.addWidget(self.console_widget)
+        ### TODO: new
+        self.slides_helper = QWidget()
+        self.slides_helper.setLayout(QVBoxLayout())
+        self.slides_helper.layout().setContentsMargins(0, 0, 0, 0)
+        self.slides_helper.layout().addWidget(self.console_widget)
+        self.back_to_tabs_btn = QPushButton("Back to tabs")
+        self.back_to_tabs_btn.clicked.connect(self.back_to_tabs)
+        self.back_to_tabs_btn.setVisible(False)
+        self.slides_helper.layout().addWidget(self.back_to_tabs_btn)
+        self.splitter.addWidget(self.slides_helper)
+
+
+    ### TODO: old
+        #self.splitter.addWidget(self.console_widget)
+
         self.slides_tabs.addTab(self.splitter, "Code Execution")
 
         helper = QWidget()
@@ -172,6 +175,7 @@ class MainWindow(QMainWindow):
         file = menu.addMenu("File")
         file.addAction("Open", self.open_slides)
         m1 = file.addMenu("Slides")
+        file.addAction("Download", self.download)
         file.addSeparator()
         file.addAction("Connect", self.connect_to_host)
         file.addAction("Create Database", self.open_db_browser)
@@ -227,6 +231,9 @@ class MainWindow(QMainWindow):
         q = QShortcut("Ctrl+K", self)
         q.activated.connect(self.show_only)
 
+        q = QShortcut("Ctrl+P", self)
+        q.activated.connect(self.console_widget.toggle_key_override)
+
         q = QShortcut("Ctrl+R", self)
         q.activated.connect(lambda: self.editors_tabs.currentWidget().reload_clicked())
 
@@ -245,7 +252,21 @@ class MainWindow(QMainWindow):
         self.cfg_font_size.value_changed.connect(lambda x: self.set_font_size(int(x.get() + 10)))
         self.cfg_dark.value_changed.connect(lambda x: self.apply_color_scheme(x.get()))
 
+        if self.cfg_override_keys.get_value():
+            self.console_widget.toggle_key_override()
+
+
         QTimer.singleShot(10, self.finish_config)
+
+    def download(self):
+        if not self.cfg_remote_folder_id.get_value() or not self.cfg_slides_path.get_value():
+            QMessageBox.warning(self, "Configuration needed", "Please set the Remote Slides Folder ID and Slides Path in the configuration first.")
+            return
+        self.widget = DrivePdfDownloaderWidget(self.cfg_remote_folder_id.get_value(), self.cfg_slides_path.get_value())
+        self.widget.done.connect(lambda path: self.open_slides(path))
+        self.widget.setWindowTitle("Drive PDF Downloader")
+        self.widget.show()
+        QTimer.singleShot(100, self.adjustSize)
 
     def open_db_browser(self):
         path = QFileDialog.getSaveFileName(self, "Create SQLite Database", filter="SQLite files (*.sqlite);;All files (*.*)", directory=self.cfg_progs_path.get_value())[0]
@@ -314,20 +335,29 @@ class MainWindow(QMainWindow):
             self.splitter.setSizes(self.sizes)
 
     def save_requested(self):
-        self.editors_tabs.currentWidget().save_program(self.cfg_progs_path.get_value(), False)
+        #self.editors_tabs.currentWidget().save_program(self.cfg_progs_path.get_value(), False)
+        for widget in self.editors_tabs.widgets(): #type: EditorWidget
+            if widget.language_editor.hasFocus():
+                widget.save_program(self.cfg_progs_path.get_value(), False)
+                break
 
     def save_as_requested(self):
-        self.editors_tabs.currentWidget().save_program(self.cfg_progs_path.get_value(), True)
+        #self.editors_tabs.currentWidget().save_program(self.cfg_progs_path.get_value(), False)
+        for widget in self.editors_tabs.widgets(): #type: EditorWidget
+            if widget.language_editor.hasFocus():
+                widget.save_program(self.cfg_progs_path.get_value(), True)
+                break
 
     def file_clicked(self, path):
         for i in range(self.editors_tabs.count()):
             widget = self.editors_tabs.widget(i)
-            if widget.path == path:
+            if isinstance(widget, EditorWidget) and widget.path == path:
                 self.editors_tabs.setCurrentWidget(widget)
                 return
 
         if ".db" in path or ".sqlite" in path:
-            editor = SQLiteBrowser(path)
+            editor = MiniSqlApp(path) #SQLiteBrowser(path)
+            editor.set_font_size(self.cfg_font_size.get_value() + 10)
             self.editors_tabs.addTab(editor, "DBrowser")
         else:
             editor = EditorWidget(self.get_editor(), self.console_widget, self.config)
@@ -342,7 +372,7 @@ class MainWindow(QMainWindow):
 
     def edit_config(self):
         if self.config.edit(min_width=400, min_height=400):
-            self.config.save("spiceditor.yaml")
+            self.config.save(self.script_path + "spiceditor.yaml")
             self.apply_config()
 
     def execute_called(self, editor_widget):
@@ -528,6 +558,7 @@ class MainWindow(QMainWindow):
                 self.slides_tabs.addTab(slides, name)
                 self.slides_tabs.setCurrentWidget(slides)
                 slides.view.setFocus()
+
         #self.slides_tabs.setCurrentIndex(0)
 
     def closeEvent(self, a0):
@@ -537,7 +568,7 @@ class MainWindow(QMainWindow):
             if isinstance(widget, Slides):
                 last.append({"filename": widget.filename, "page": widget.page})
         self.cfg_last.set_value(last)
-        self.config.save("spiceditor.yaml")
+        self.config.save(self.script_path + "spiceditor.yaml")
 
     def toggle_fullscreen(self):
         if self.isFullScreen():
@@ -562,3 +593,23 @@ class MainWindow(QMainWindow):
         editor.language_editor.setFocus()
         self.slides_tabs.setCurrentIndex(0)
         editor.show_all_code()
+
+    def back_to_tabs(self):
+        slides = self.slides_helper.layout().itemAt(2).widget()
+        print("Back to tabs:", slides)
+        self.slides_tabs.addTab(slides, slides.filename)
+        self.slides_tabs.setCurrentWidget(slides)
+        slides.view.setFocus()
+        self.back_to_tabs_btn.setVisible(False)
+
+
+    def slide_tab_double_clicked(self, index):
+        if index == 0:
+            return
+        if self.slides_helper.layout().count() > 2:
+            self.back_to_tabs()
+        widget = self.slides_tabs.widget(index)
+        self.slides_helper.layout().addWidget(widget)
+        self.back_to_tabs_btn.setVisible(True)
+        widget.show()
+        self.slides_tabs.setCurrentIndex(0)

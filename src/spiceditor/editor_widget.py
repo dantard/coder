@@ -9,6 +9,7 @@ from PyQt5.QtWidgets import QVBoxLayout, QToolBar, QStatusBar, QWidget, QComboBo
 from spiceditor import utils
 
 import spiceditor.resources  # noqa
+from spiceditor.jupyter_console import JupyterConsole
 
 
 class MyStatusBar(QStatusBar):
@@ -98,6 +99,8 @@ class EditorWidget(QWidget):
 
         self.language_editor = language_editor
         self.console = console
+        self.console: JupyterConsole
+        self.console.execute_code_requested.connect(self.execute_code)
 
         # Left side layout
         left_layout = QVBoxLayout()
@@ -211,7 +214,7 @@ class EditorWidget(QWidget):
         if self.path is None or save_as:
             ext = self.console.get_file_extension()
             filename, selected_filter = QFileDialog.getSaveFileName(self, "Save code", directory=path,
-                                                       filter="Language files (*" + ext + ");;CSV files (*.csv);;YAML files (*.yaml *.yml);; TXT files (*.txt);; All files (*.*)")
+                                                       filter="All files (*.*);; Language files (*" + ext + ");;CSV files (*.csv);;YAML files (*.yaml *.yml);; TXT files (*.txt)")
             if not filename:
                 return
             if len(self.file_watcher.files()) > 0:
@@ -224,6 +227,8 @@ class EditorWidget(QWidget):
                 self.path = filename.replace(".yaml", "").replace(".yml", "") + ".yaml"
             elif "txt" in selected_filter:
                 self.path = filename.replace(".txt", "") + ".txt"
+            else:
+                self.path = filename
 
             self.file_watcher.addPath(self.path)
             self.file_modified.emit(self, False)

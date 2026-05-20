@@ -412,7 +412,7 @@ class SpiceMagicEditor(CollabPlainTextEdit):
         if self.suggestion is None:
             current_words = re.split(r'\W+', self.toPlainText())
             text_before_cursor = self.get_text_before_cursor()
-            words_before_cursos = re.split(r"[+\-*/= ]", text_before_cursor)
+            words_before_cursos = re.split(r"[+\-*/= ('\"]", text_before_cursor)
             self.candidates = []
             if words_before_cursos[-1] != "":
                 word_set = list(set(current_words + self.highlighter.get_keywords() + self.autocomplete_words))

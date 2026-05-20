@@ -1,5 +1,5 @@
-from PyQt5.QtCore import QTimer
-from PyQt5.QtGui import QFont, QIcon
+from PyQt5.QtCore import QTimer, Qt, QEvent, pyqtSignal
+from PyQt5.QtGui import QFont, QIcon, QKeyEvent
 from PyQt5.QtWidgets import QVBoxLayout, QPushButton, QToolBar
 from qtconsole.manager import QtKernelManager
 
@@ -9,6 +9,8 @@ from spiceditor.spice_console import SpiceConsole
 
 # noinspection PyProtectedMember
 class JupyterConsole(SpiceConsole):
+
+    execute_code_requested = pyqtSignal()
 
     def __init__(self, config):
         super().__init__(config)
@@ -139,3 +141,29 @@ class JupyterConsole(SpiceConsole):
         font.setStyleHint(QFont.TypeWriter)
         font.setPixelSize(font_size)
         self.jupyter_widget._control.setFont(font)
+
+    def toggle_key_override(self):
+        if self.jupyter_widget.keys:
+            self.jupyter_widget.set_key_override([])
+        else:
+            self.replace_key_bindings()
+
+    def replace_key_bindings(self):
+        # [(key, modifier, action, event^), ...] ^if action is replace otherwise None
+        self.jupyter_widget.set_key_override(
+            [(Qt.Key_Up, Qt.NoModifier, "disable", None),
+             (Qt.Key_Up, Qt.ShiftModifier, "disable", None),
+             (Qt.Key_Return, Qt.ControlModifier, "run", self.execute_code_requested.emit),
+             (Qt.Key_Up, Qt.ControlModifier, "replace", QKeyEvent(QEvent.Type.KeyPress,
+                                                                  Qt.Key_Up,
+                                                                  Qt.KeyboardModifier.NoModifier
+                                                                  )),
+             (Qt.Key_Down, Qt.ControlModifier, "replace", QKeyEvent(QEvent.Type.KeyPress,
+                                                                    Qt.Key_Down,
+                                                                    Qt.KeyboardModifier.NoModifier
+                                                                    )),
+             (Qt.Key_Down, Qt.ControlModifier, "replace", QKeyEvent(QEvent.Type.KeyPress,
+                                                                    Qt.Key_Down,
+                                                                    Qt.KeyboardModifier.NoModifier
+                                                                    ))
+             ])
