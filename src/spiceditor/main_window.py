@@ -4,7 +4,7 @@ import sys
 from PyQt5.QtCore import Qt, QTimer,QEvent
 from PyQt5.QtGui import QIcon, QKeyEvent
 from PyQt5.QtWidgets import QApplication, QMainWindow, QSplitter, QPushButton, QVBoxLayout, QWidget, \
-    QTabWidget, QFileDialog, QShortcut, QTabBar, QMessageBox, QToolBar, QDialog
+    QTabWidget, QFileDialog, QShortcut, QTabBar, QMessageBox, QToolBar, QDialog, QLabel
 from easyconfig2.easyconfig import EasyConfig2 as EasyConfig
 import sqlite3
 import spiceditor.resources  # noqa
@@ -21,6 +21,8 @@ from minimal_sql_browser.msb import MiniSqlApp
 #from spiceditor.sqlbrowser import SQLiteBrowser
 from spiceditor.textract import Slides
 import argparse
+import platform
+import socket
 
 
 class CustomTabBar(QTabBar):
@@ -31,17 +33,31 @@ class CustomTabBar(QTabBar):
         self.a = QPushButton(self)
 
 
+def parse_args():
+    """Parse the command line. Call it before creating the QApplication:
+    -h and errors exit the program, which crashes Qt if widgets exist."""
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--userid", type=str, help="User name for collaborative editing (default: computer name)",
+                        default=None)
+    parser.add_argument("--doc", type=str, default="spice", help="Document name for collaborative editing")
+    parser.add_argument("--server", type=str, default=None,
+                        help="Collaborative editing server (host:port) to connect to at startup")
+    parser.add_argument("--readonly", action="store_true",
+                        help="The code editors cannot be edited (code can still be selected, copied and run)")
+    return parser.parse_args()
+
+
 class MainWindow(QMainWindow):
 
-    def __init__(self, console):
+    def __init__(self, console, args=None):
         super().__init__()
 
-        parser = argparse.ArgumentParser()
-        parser.add_argument("--userid", type=str, help="User ID for collaborative editing", default=None)
-        parser.add_argument("--host", action="store_true", help="Start in host mode for collaborative editing")
-        args = parser.parse_args()
+        if args is None:
+            args = parse_args()
+        self.collab_doc = args.doc
+        self.readonly = args.readonly
 
-        self.userid = args.userid
+        self.userid = args.userid or self.computer_name()
         self.script_path = os.path.dirname(os.path.abspath(__file__)) + os.sep
         self.show_iter = 0
         self.sizes = None
@@ -104,8 +120,15 @@ class MainWindow(QMainWindow):
         self.base_editor = EditorWidget(self.get_editor(), self.console_widget, self.config)
         self.base_editor.file_modified.connect(self.file_modified)
         self.base_editor.execute_called.connect(self.execute_called)
-        if args.host:
-            self.base_editor.get_editor().start_server(args.userid if args.userid else "host")
+        self.base_editor.get_editor().collab_status.connect(lambda msg: self.statusBar().showMessage(msg))
+        if self.readonly:
+            readonly_label = QLabel("Read-only")
+            readonly_label.setToolTip("Started with --readonly: the code cannot be edited")
+            readonly_label.setStyleSheet("padding: 0 8px; font-weight: bold;")
+            self.statusBar().addPermanentWidget(readonly_label)
+        if args.server:
+            self.base_editor.get_editor().connect_to_server(args.server, args.doc,
+                                                            self.userid)
 
         self.config.load(self.script_path + "spiceditor.yaml")
         self.console_widget.config_read()
@@ -305,19 +328,21 @@ class MainWindow(QMainWindow):
     def toggle_split_view_mode(self):
         self.editors_tabs.toggle_orientation()
 
+    @staticmethod
+    def computer_name():
+        """Short computer name on Linux, Windows and macOS (e.g. "pc01", not "pc01.local")."""
+        name = platform.node() or socket.gethostname() or os.environ.get("COMPUTERNAME", "")
+        return name.split(".")[0] or "User"
+
     def connect_to_host(self):
-        dialog = ConnectionDialog(self.userid if self.userid else "User", self)
+        dialog = ConnectionDialog(self.userid, self, self.collab_doc)
         if dialog.exec_() == QDialog.Accepted:
             values = dialog.get_values()
             host = values.get("host_address")
             port = values.get("host_port")
             user_id = values.get("user_id")
-            sock = self.base_editor.get_editor().connect_to_host(user_id, host=host, port=int(port))
-            sock.connected.connect(
-                lambda: QMessageBox.information(self, "Connected",
-                                                f"Successfully connected to {host}:{port} as user '{user_id}'"))
-            sock.errorOccurred.connect(
-                lambda: QMessageBox.critical(self, "Connection Error", f"Failed to connect to {host}:{port}"))
+            self.collab_doc = values.get("document") or self.collab_doc
+            self.base_editor.get_editor().connect_to_server(f"http://{host}:{port}", self.collab_doc, user_id)
 
     def create_timer(self, hours=0, minutes=0, seconds=0):
         total_seconds = hours * 3600 + minutes * 60 + seconds
@@ -433,6 +458,7 @@ class MainWindow(QMainWindow):
         #     editor = PascalEditor()
         # else:
         editor = PythonEditor(PythonHighlighter())
+        editor.set_editable(not self.readonly)
         return editor
 
     def tab_close_requested(self, index):
@@ -572,6 +598,7 @@ class MainWindow(QMainWindow):
         #self.slides_tabs.setCurrentIndex(0)
 
     def closeEvent(self, a0):
+        self.base_editor.get_editor().leave()
         last = []
         for i in range(1, self.slides_tabs.count()):
             widget = self.slides_tabs.widget(i)

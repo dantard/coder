@@ -231,20 +231,22 @@ padding: 4px 10px;
 
 
 class ConnectionDialog(QDialog):
-    def __init__(self, userid, parent=None):
+    def __init__(self, userid, parent=None, document="spice"):
         super().__init__(parent)
         self.setWindowTitle("Connection Settings")
 
         # Fields
         self.user_id_edit = QLineEdit(userid)
         self.host_address_edit = QLineEdit("127.0.0.1")
-        self.host_port_edit = QLineEdit("12345")
+        self.host_port_edit = QLineEdit("5000")
+        self.document_edit = QLineEdit(document)
 
         # Form layout
         form = QFormLayout()
-        form.addRow("User ID:", self.user_id_edit)
-        form.addRow("Host Address:", self.host_address_edit)
-        form.addRow("Host Port:", self.host_port_edit)
+        form.addRow("User name:", self.user_id_edit)
+        form.addRow("Server Address:", self.host_address_edit)
+        form.addRow("Server Port:", self.host_port_edit)
+        form.addRow("Document:", self.document_edit)
 
         # OK / Cancel buttons
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
@@ -261,4 +263,5 @@ class ConnectionDialog(QDialog):
             "user_id": self.user_id_edit.text(),
             "host_address": self.host_address_edit.text(),
             "host_port": self.host_port_edit.text(),
+            "document": self.document_edit.text(),
         }

@@ -10,7 +10,7 @@ from PyQt5.QtWidgets import QTextEdit, QHBoxLayout, QScrollBar, QApplication, QW
 from spiceditor.line_number_text_edit import LineNumberTextEdit
 from spiceditor.magic_scrollbar import MagicScrollBar
 
-from spiceditor.ColabTextEditors import CollabPlainTextEdit
+from spiceditor.client import CollabPlainTextEdit
 
 
 # Claude
@@ -79,6 +79,8 @@ class SpiceMagicEditor(CollabPlainTextEdit):
         self.line_number_area2.update()
 
     def toggle_comment(self):
+        if self.isReadOnly():
+            return
         cursor = self.textCursor()
         start = cursor.selectionStart()
         end = cursor.selectionEnd()
@@ -322,6 +324,19 @@ class SpiceMagicEditor(CollabPlainTextEdit):
     def keyPressEvent(self, e: QtGui.QKeyEvent) -> None:
         self.setFocusPolicy(Qt.StrongFocus)
 
+        if self.isReadOnly():
+            # not editable: running the code is still allowed, and Qt's own
+            # read-only handling gives navigation, selection and copy
+            if e.key() in (Qt.Key_Return, Qt.Key_Enter):
+                if e.modifiers() == Qt.ControlModifier:
+                    self.ctrl_enter.emit()
+                    return
+                if e.modifiers() == (Qt.ControlModifier | Qt.ShiftModifier):
+                    self.ctrl_shift_enter.emit()
+                    return
+            super().keyPressEvent(e)
+            return
+
         if e.key() == Qt.Key_Escape:
             self.set_mode(0 if self.mode == 1 else 0)
 
@@ -484,6 +499,8 @@ class PascalEditor(SpiceMagicEditor):
 
 class PythonEditor(SpiceMagicEditor):
     def format_code(self):
+        if self.isReadOnly():
+            return
         code = self.toPlainText()
         if not code.endswith("\n"):
             code += "\n"
