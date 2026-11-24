@@ -51,8 +51,10 @@ class Document:
         return len(self.history)
 
     # all methods below must be called with self.cond held
-    def touch(self, client_id, name=None):
+    def touch(self, client_id, name=None, create=True):
         cur = self.cursors.get(client_id)
+        if cur is None and not create:
+            return None
         if cur is None:
             used = {c["color"] for c in self.cursors.values()}
             free = [c for c in COLORS if c not in used] or COLORS
@@ -193,7 +195,9 @@ def poll(doc_id):
                 break
             doc.cond.wait(remaining)
             if client_id:
-                doc.touch(client_id)
+                # only keep an existing cursor alive: if the client left
+                # meanwhile, this request must not bring it back as "anonymous"
+                doc.touch(client_id, create=False)
         doc.expire_cursors()
         ops = [{"op": op.to_json(), "client_id": cid, "op_id": oid}
                for op, cid, oid in doc.history[since:]]

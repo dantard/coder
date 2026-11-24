@@ -18,6 +18,7 @@ Run:  python client.py --server http://localhost:5000 --doc mydoc --name Alice
 import argparse
 import json
 import sys
+import time
 import uuid
 
 from PyQt5.QtCore import QByteArray, QTimer, QUrl, QUrlQuery, Qt, pyqtSignal
@@ -37,6 +38,8 @@ class CollabClientMixin:
     The concrete class must call _collab_setup() after the Qt constructor
     and must define a ``collab_status = pyqtSignal(str)`` signal.
     """
+
+    LABEL_TIMEOUT = 1.0   # seconds a remote user's name stays visible after they type
 
     # ------------------------------------------------------------------
     # setup
@@ -64,6 +67,12 @@ class CollabClientMixin:
         self.remote_cursors = {}  # client_id -> {name, color, pos, anchor}
         self._local_selections = []
         self._remote_selections = []
+        self._last_typed = {}     # client_id -> time.monotonic() of their last edit
+
+        # repaints while name labels are visible, so they disappear on time
+        self.label_timer = QTimer(self)
+        self.label_timer.setInterval(250)
+        self.label_timer.timeout.connect(self._on_label_timer)
 
         self._initial_text = ""   # local text to publish if the doc is empty
         self._saved_placeholder = ""
@@ -148,6 +157,7 @@ class CollabClientMixin:
                 QApplication.processEvents()
         self.outstanding = self.outstanding_id = self.buffer = None
         self.remote_cursors = {}
+        self._last_typed = {}
         self._refresh_remote_cursors()
         self.setReadOnly(not self._editable)
         self.setUndoRedoEnabled(True)
@@ -320,6 +330,8 @@ class CollabClientMixin:
                 self._on_ack()
             else:
                 self._on_remote_op(TextOperation.from_json(item["op"]))
+                self._last_typed[item["client_id"]] = time.monotonic()
+                self.label_timer.start()
             if not self.ready:                 # a resync was triggered
                 return
         if data["rev"] != self.rev:           # should never happen
@@ -328,6 +340,8 @@ class CollabClientMixin:
         self.cursor_version = data["cv"]
         self.remote_cursors = {cid: c for cid, c in data["cursors"].items()
                                if cid != self.client_id}
+        self._last_typed = {cid: t for cid, t in self._last_typed.items()
+                            if cid in self.remote_cursors}
         self._refresh_remote_cursors()
         self._poll()
 
@@ -425,6 +439,16 @@ class CollabClientMixin:
         super().setExtraSelections(self._local_selections + self._remote_selections)
         self.viewport().update()
 
+    def _label_visible(self, cid):
+        """The name is shown only while that user is typing."""
+        last = self._last_typed.get(cid)
+        return last is not None and time.monotonic() - last < self.LABEL_TIMEOUT
+
+    def _on_label_timer(self):
+        self.viewport().update()
+        if not any(self._label_visible(cid) for cid in self._last_typed):
+            self.label_timer.stop()
+
     def paintEvent(self, event):
         super().paintEvent(event)
         if not self.remote_cursors:
@@ -437,12 +461,14 @@ class CollabClientMixin:
             small.setPixelSize(max(9, int(self.font().pixelSize() * 0.75)))
         painter.setFont(small)
         fm = painter.fontMetrics()
-        for cur in self.remote_cursors.values():
+        for cid, cur in self.remote_cursors.items():
             tc = QTextCursor(self.document())
             tc.setPosition(self._local_index(cur["pos"]))
             rect = self.cursorRect(tc)
             color = QColor(cur["color"])
             painter.fillRect(rect.x(), rect.y(), 2, rect.height(), color)
+            if not self._label_visible(cid):
+                continue
             label = cur["name"]
             w, h = fm.horizontalAdvance(label) + 6, fm.height()
             y = rect.y() - h if rect.y() - h >= 0 else rect.bottom()
