@@ -48,9 +48,10 @@ def _buttons(*specs):
 class AdminWidget(QWidget):
     def __init__(self, server="127.0.0.1:5000", token="", parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Spice — collaboration admin")
+        self.setWindowTitle("Spice - collaboration admin")
         self.net = QNetworkAccessManager(self)
         self.refresh_reply = None
+        self.started = False   # Connect pressed: refresh while the window is shown
         self.sessions = {}     # session -> QTreeWidgetItem
         self.clients = {}      # (session, client_id) -> (item, mute button)
         self.data = {}         # session -> list of client dicts (last refresh)
@@ -143,8 +144,20 @@ class AdminWidget(QWidget):
         self.sessions.clear()
         self.clients.clear()
         self.status.setText("Connecting…")
+        self.started = True
         self.timer.start()
         self.refresh()
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        if self.started and not self.timer.isActive():
+            self.timer.start()
+            self.refresh()
+
+    def hideEvent(self, event):
+        # no polling while the window is closed
+        self.timer.stop()
+        super().hideEvent(event)
 
     def refresh(self):
         if not self.timer.isActive() or self.refresh_reply is not None:
@@ -172,7 +185,7 @@ class AdminWidget(QWidget):
             self._update_session(name, session)
 
         users = sum(len(s["clients"]) for s in sessions.values())
-        self.status.setText(f"Connected to {self._base()} — {users} user(s) in "
+        self.status.setText(f"Connected to {self._base()} - {users} user(s) in "
                             f"{sum(1 for s in sessions.values() if s['clients'])} session(s)")
 
     def _update_session(self, name, session):

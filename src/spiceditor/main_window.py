@@ -8,6 +8,7 @@ from PyQt5.QtWidgets import QApplication, QMainWindow, QSplitter, QPushButton, Q
 from easyconfig2.easyconfig import EasyConfig2 as EasyConfig
 import sqlite3
 import spiceditor.resources  # noqa
+from spiceditor.admin import AdminWidget
 from spiceditor.bw_timer import CountdownTimer
 from spiceditor.dialogs import Author, ConnectionDialog
 from spiceditor.double_tab_widget import DoubleTabWidget
@@ -43,6 +44,8 @@ def parse_args():
                         help="Collaboration session the first tab joins with --server (default: 1)")
     parser.add_argument("--server", type=str, default=None,
                         help="Collaboration server (host:port): the first tab connects to it at startup")
+    parser.add_argument("--admin-token", type=str, default="",
+                        help="Admin token of the collaboration server, for Edit > Admin")
     parser.add_argument("--readonly", action="store_true",
                         help="The code editors cannot be edited (code can still be selected, copied and run)")
     return parser.parse_args()
@@ -65,6 +68,8 @@ class MainWindow(QMainWindow):
             else:
                 self.collab_host = address
         self.readonly = args.readonly
+        self.admin_token = args.admin_token
+        self.admin_widget = None
 
         self.userid = args.userid or self.computer_name()
         self.script_path = os.path.dirname(os.path.abspath(__file__)) + os.sep
@@ -227,6 +232,7 @@ class MainWindow(QMainWindow):
 
         m3 = menu.addMenu("Edit")
         m3.addAction("Preferences", self.edit_config)
+        m3.addAction("Admin", self.show_admin)
         m2 = menu.addMenu("Help")
         m2.addAction("About", lambda: Author().exec_())
 
@@ -340,6 +346,21 @@ class MainWindow(QMainWindow):
         """Short computer name on Linux, Windows and macOS (e.g. "pc01", not "pc01.local")."""
         name = platform.node() or socket.gethostname() or os.environ.get("COMPUTERNAME", "")
         return name.split(".")[0] or "User"
+
+    def show_admin(self):
+        """Edit > Admin: who is connected to the collaboration server."""
+        if self.admin_widget is None:
+            self.admin_widget = AdminWidget(f"{self.collab_host}:{self.collab_port}",
+                                            self.admin_token, self)
+            self.admin_widget.setWindowFlag(Qt.Window)   # its own window, owned by Spice
+            if self.admin_token:
+                self.admin_widget.start()
+        elif not self.admin_widget.started:
+            # not connected yet: follow the server the tabs use now
+            self.admin_widget.server_edit.setText(f"{self.collab_host}:{self.collab_port}")
+        self.admin_widget.show()
+        self.admin_widget.raise_()
+        self.admin_widget.activateWindow()
 
     def editor_widgets(self):
         return [w for w in self.editors_tabs.widgets() if isinstance(w, EditorWidget)]
