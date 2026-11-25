@@ -20,16 +20,18 @@ import json
 import sys
 import time
 import uuid
+from urllib.parse import quote, urlencode
 
-from PyQt5.QtCore import QByteArray, QTimer, QUrl, QUrlQuery, Qt, pyqtSignal
+from PyQt5.QtCore import QTimer, Qt, pyqtSignal
 from PyQt5.QtGui import QColor, QFont, QPainter, QTextCharFormat, QTextCursor
-from PyQt5.QtNetwork import QNetworkAccessManager, QNetworkReply, QNetworkRequest
 from PyQt5.QtWidgets import QApplication, QTextEdit, QPlainTextEdit
 
 try:
     from spiceditor.ot import TextOperation, transform_index
+    from spiceditor import webrequest
 except ImportError:  # running client.py directly from its folder
     from ot import TextOperation, transform_index
+    import webrequest
 
 
 class CollabClientMixin:
@@ -78,8 +80,6 @@ class CollabClientMixin:
         self._initial_text = ""   # local text to publish if the doc is empty
         self._saved_placeholder = ""
 
-        self.net = None
-        self.pending = {}         # QNetworkReply -> (callback, session)
         self.poll_reply = None
 
         self.document().contentsChanged.connect(self._on_local_change)
@@ -110,10 +110,6 @@ class CollabClientMixin:
         self.collab_active = True
         self._initial_text = self.toPlainText()
         self._saved_placeholder = self.placeholderText()
-
-        if self.net is None:
-            self.net = QNetworkAccessManager(self)
-            self.net.finished.connect(self._on_reply_finished)
 
         # no local undo stack while collaborating, because undo would also
         # revert other people's edits
@@ -192,39 +188,27 @@ class CollabClientMixin:
             self._back_to_local("disconnected by the server")
 
     # ------------------------------------------------------------------
-    # small HTTP helpers (async, on the Qt event loop)
+    # small HTTP helpers (async: urllib in a thread, result on the Qt thread)
     # ------------------------------------------------------------------
     def _url(self, path, params=None):
-        url = QUrl(f"{self.server}/api/docs/{self.doc_id}{path}")
+        url = f"{self.server}/api/docs/{quote(str(self.doc_id), safe='')}{path}"
         if params:
-            q = QUrlQuery()
-            for k, v in params.items():
-                q.addQueryItem(k, str(v))
-            url.setQuery(q)
+            url += "?" + urlencode({k: str(v) for k, v in params.items()})
         return url
 
     def _get(self, path, params, callback, timeout_ms=10000):
-        req = QNetworkRequest(self._url(path, params))
-        req.setTransferTimeout(timeout_ms)
-        reply = self.net.get(req)
-        self.pending[reply] = (callback, self._session)
-        return reply
+        session = self._session
+        return webrequest.get(self._url(path, params),
+                              lambda ok, status, body: self._on_reply(callback, session, ok, status, body),
+                              timeout=timeout_ms / 1000)
 
     def _post(self, path, payload, callback=None, session=0):
-        req = QNetworkRequest(self._url(path))
-        req.setHeader(QNetworkRequest.ContentTypeHeader, "application/json")
-        req.setTransferTimeout(10000)
-        reply = self.net.post(req, QByteArray(json.dumps(payload).encode()))
         # session=None: deliver the reply even after a leave/reconnect
-        self.pending[reply] = (callback, self._session if session == 0 else session)
-        return reply
+        session = self._session if session == 0 else session
+        return webrequest.post(self._url(path), payload,
+                               lambda ok, status, body: self._on_reply(callback, session, ok, status, body))
 
-    def _on_reply_finished(self, reply):
-        callback, session = self.pending.pop(reply, (None, None))
-        status = reply.attribute(QNetworkRequest.HttpStatusCodeAttribute) or 0
-        body = bytes(reply.readAll()) if reply.isOpen() else b""
-        error = reply.error()
-        reply.deleteLater()
+    def _on_reply(self, callback, session, ok, status, body):
         if session is not None and session != self._session:
             return                               # stale reply
         data = None
@@ -233,7 +217,6 @@ class CollabClientMixin:
         except ValueError:
             pass
         if callback:
-            ok = error == QNetworkReply.NoError and 200 <= status < 300
             callback(ok, status, data)
 
     def _status(self, text):

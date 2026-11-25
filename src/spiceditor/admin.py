@@ -10,13 +10,18 @@ Run:  python admin.py --server 127.0.0.1:5000 --token SECRET
 import argparse
 import json
 import sys
+from urllib.parse import quote
 
-from PyQt5.QtCore import QByteArray, QTimer, QUrl, Qt
+from PyQt5.QtCore import QTimer, Qt
 from PyQt5.QtGui import QColor, QIcon, QPixmap
-from PyQt5.QtNetwork import QNetworkAccessManager, QNetworkReply, QNetworkRequest
 from PyQt5.QtWidgets import (QApplication, QCheckBox, QHBoxLayout, QHeaderView, QLabel,
                              QLineEdit, QMessageBox, QPushButton, QTreeWidget,
                              QTreeWidgetItem, QVBoxLayout, QWidget)
+
+try:
+    from spiceditor import webrequest
+except ImportError:  # running admin.py directly from its folder
+    import webrequest
 
 REFRESH_MS = 2000
 COL_NAME, COL_STATUS, COL_SEEN, COL_ACTIONS = range(4)
@@ -49,7 +54,6 @@ class AdminWidget(QWidget):
     def __init__(self, server="127.0.0.1:5000", token="", parent=None):
         super().__init__(parent)
         self.setWindowTitle("Spice - collaboration admin")
-        self.net = QNetworkAccessManager(self)
         self.refresh_reply = None
         self.started = False   # Connect pressed: refresh while the window is shown
         self.sessions = {}     # session -> QTreeWidgetItem
@@ -105,28 +109,20 @@ class AdminWidget(QWidget):
         return server if "://" in server else "http://" + server
 
     def _request(self, method, path, payload=None, callback=None):
-        req = QNetworkRequest(QUrl(self._base() + path))
-        req.setRawHeader(b"X-Admin-Token", self.token_edit.text().strip().encode())
-        req.setTransferTimeout(5000)
-        if method == "GET":
-            reply = self.net.get(req)
-        else:
-            req.setHeader(QNetworkRequest.ContentTypeHeader, "application/json")
-            reply = self.net.post(req, QByteArray(json.dumps(payload or {}).encode()))
+        headers = {"X-Admin-Token": self.token_edit.text().strip()}
 
-        def finished():
-            status = reply.attribute(QNetworkRequest.HttpStatusCodeAttribute) or 0
-            body = bytes(reply.readAll())
-            error = reply.error()
-            reply.deleteLater()
+        def finished(ok, status, body):
             try:
                 data = json.loads(body) if body else {}
             except ValueError:
                 data = {}
             if callback:
-                callback(error == QNetworkReply.NoError and 200 <= status < 300, status, data)
-        reply.finished.connect(finished)
-        return reply
+                callback(ok, status, data)
+
+        url = self._base() + path
+        if method == "GET":
+            return webrequest.get(url, finished, headers=headers, timeout=5)
+        return webrequest.post(url, payload, finished, headers=headers, timeout=5)
 
     def _report_error(self, status, data):
         if status == 401:
@@ -241,7 +237,7 @@ class AdminWidget(QWidget):
         self.refresh()
 
     def set_muted(self, session, client_id, muted):
-        self._request("POST", f"/api/admin/docs/{session}/clients/{client_id}/mute",
+        self._request("POST", f"/api/admin/docs/{quote(session, safe='')}/clients/{client_id}/mute",
                       {"muted": muted}, self._after_action)
 
     def toggle_mute(self, session, client_id):
@@ -261,7 +257,7 @@ class AdminWidget(QWidget):
         answer = QMessageBox.question(self, "Disconnect user",
                                       f"Disconnect {client['name']} from session {session}?")
         if answer == QMessageBox.Yes:
-            self._request("POST", f"/api/admin/docs/{session}/clients/{client_id}/kick",
+            self._request("POST", f"/api/admin/docs/{quote(session, safe='')}/clients/{client_id}/kick",
                           callback=self._after_action)
 
 

@@ -1,7 +1,11 @@
 import json
 
-from PyQt5.QtCore import Qt, QRegExp, QTimer, QUrl
-from PyQt5.QtNetwork import QNetworkAccessManager, QNetworkRequest
+try:
+    from spiceditor import webrequest
+except ImportError:  # running from this folder
+    import webrequest
+
+from PyQt5.QtCore import Qt, QRegExp, QTimer
 from PyQt5.QtGui import QIntValidator, QRegExpValidator
 from PyQt5.QtWidgets import QPushButton, QTextEdit, QVBoxLayout, QDialog, QTabWidget, QWidget
 
@@ -245,7 +249,6 @@ class ConnectionDialog(QDialog):
         self.setWindowTitle("Connect this tab")
         self.fallback_session = session     # used if the server cannot be reached
         self.existing = set()               # session names on the server
-        self.net = QNetworkAccessManager(self)
         self.list_reply = None
 
         # connection fields
@@ -343,19 +346,12 @@ class ConnectionDialog(QDialog):
         if not host or not port:
             return
         self.list_status.setText("Loading sessions…")
-        req = QNetworkRequest(QUrl(f"http://{host}:{port}/api/sessions"))
-        req.setTransferTimeout(4000)
-        reply = self.list_reply = self.net.get(req)
-        reply.finished.connect(lambda: self._on_sessions(reply))
+        # an aborted (superseded) request never calls back
+        self.list_reply = webrequest.get(f"http://{host}:{port}/api/sessions",
+                                         self._on_sessions, timeout=4)
 
-    def _on_sessions(self, reply):
-        if reply is not self.list_reply:       # superseded by a newer request
-            reply.deleteLater()
-            return
+    def _on_sessions(self, ok, status, body):
         self.list_reply = None
-        status = reply.attribute(QNetworkRequest.HttpStatusCodeAttribute) or 0
-        body = bytes(reply.readAll()) if reply.isOpen() else b""
-        reply.deleteLater()
         try:
             sessions = json.loads(body)["sessions"] if status == 200 else None
         except (ValueError, KeyError):
@@ -419,6 +415,13 @@ class ConnectionDialog(QDialog):
                 self.create_hint.setText(f"Session {name} already exists: select it in the list to join it")
             self.ok_button.setText("Create")
         self.ok_button.setEnabled(fields_ok and session_ok)
+
+    def done(self, result):
+        # closed: a session list still loading must not call back
+        if self.list_reply is not None:
+            self.list_reply.abort()
+            self.list_reply = None
+        super().done(result)
 
     def get_values(self):
         session = (self.selected_session() if self.join_radio.isChecked()
