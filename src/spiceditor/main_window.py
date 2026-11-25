@@ -1,6 +1,6 @@
 import os
 import sys
-#from spiceditor.drive_pdf_downloader import DrivePdfDownloaderWidget
+from spiceditor.drive_pdf_downloader import DrivePdfDownloaderWidget
 from PyQt5.QtCore import Qt, QTimer,QEvent
 from PyQt5.QtGui import QIcon, QKeyEvent
 from PyQt5.QtWidgets import QApplication, QMainWindow, QSplitter, QPushButton, QVBoxLayout, QWidget, \
@@ -161,7 +161,7 @@ class MainWindow(QMainWindow):
         helper.layout().setContentsMargins(0,5,0,0)
         helper.layout().setSpacing(0)
 
-        self.file_browser = FileBrowser(self.cfg_progs_path.get_value(), filters=[".py", ".csv", ".txt", ".yaml", ".db", ".sqlite"], )
+        self.file_browser = FileBrowser(self.cfg_progs_path.get_value())
         self.file_browser.signals.file_selected.connect(self.file_clicked)
         self.file_browser.signals.directory_changed.connect(lambda path: self.cfg_progs_path.set_value(path))
 
