@@ -2,7 +2,6 @@ import sys
 
 from PyQt5.QtCore import pyqtSignal, Qt, QEvent
 from PyQt5.QtWidgets import QSplitter, QTabWidget, QTabBar, QMenu, QPushButton, QWidget, QHBoxLayout, QLabel
-from pyqtgraph.examples.MultiDataPlot import widget
 
 
 class PlusButton(QWidget):
