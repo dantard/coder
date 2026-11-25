@@ -16,6 +16,7 @@ import ssl
 import threading
 import urllib.error
 import urllib.request
+from urllib.parse import urlsplit
 
 from PyQt5.QtCore import QObject, pyqtSignal
 
@@ -24,6 +25,8 @@ try:
     _SSL_CONTEXT = ssl.create_default_context(cafile=certifi.where())
 except ImportError:
     _SSL_CONTEXT = ssl.create_default_context()
+
+DEFAULT_PORT = 5000
 
 _live = set()   # requests still running: keep them alive until delivered
 
@@ -84,3 +87,31 @@ def get(url, callback=None, headers=None, timeout=10):
 
 def post(url, payload, callback=None, headers=None, timeout=10):
     return Request("POST", url, payload or {}, headers, timeout, callback)
+
+
+def server_url(address, default_port=DEFAULT_PORT):
+    """The base URL of a server, from what the user typed:
+
+        host, host:port        -> http://host:port   (port 5000 if not given)
+        http://... https://... -> used as given      (e.g. https://name.trycloudflare.com)
+
+    Returns "" if the address is empty or not valid.
+    """
+    address = address.strip().rstrip("/")
+    if not address:
+        return ""
+    if "://" not in address:
+        address = "http://" + address
+        try:
+            if urlsplit(address).port is None:
+                address += f":{default_port}"
+        except ValueError:
+            return ""
+    try:
+        parts = urlsplit(address)
+        parts.port                      # raises ValueError if the port is not valid
+    except ValueError:
+        return ""
+    if parts.scheme not in ("http", "https") or not parts.hostname:
+        return ""
+    return address

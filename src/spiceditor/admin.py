@@ -6,6 +6,7 @@ Shows every session and who is connected to it, and lets you mute a client
 Needs the admin token the server prints at startup.
 
 Run:  python admin.py --server 127.0.0.1:5000 --token SECRET
+      python admin.py --server https://name.trycloudflare.com --token SECRET
 """
 import argparse
 import json
@@ -61,7 +62,7 @@ class AdminWidget(QWidget):
         self.data = {}         # session -> list of client dicts (last refresh)
 
         self.server_edit = QLineEdit(server)
-        self.server_edit.setPlaceholderText("host:port")
+        self.server_edit.setPlaceholderText("host:port or https://name.example.org")
         self.token_edit = QLineEdit(token)
         self.token_edit.setEchoMode(QLineEdit.Password)
         self.token_edit.setPlaceholderText("admin token printed by server.py")
@@ -105,8 +106,7 @@ class AdminWidget(QWidget):
     # HTTP
     # ------------------------------------------------------------------
     def _base(self):
-        server = self.server_edit.text().strip().rstrip("/")
-        return server if "://" in server else "http://" + server
+        return webrequest.server_url(self.server_edit.text())
 
     def _request(self, method, path, payload=None, callback=None):
         headers = {"X-Admin-Token": self.token_edit.text().strip()}
@@ -263,7 +263,7 @@ class AdminWidget(QWidget):
 
 def main():
     parser = argparse.ArgumentParser(description="Admin panel for the Spice collaboration server")
-    parser.add_argument("--server", default="127.0.0.1:5000", help="server address (host:port)")
+    parser.add_argument("--server", default="127.0.0.1:5000", help="server address: host:port or a full http(s):// URL")
     parser.add_argument("--token", default="", help="admin token printed by server.py")
     args = parser.parse_args()  # before Qt, so -h and errors exit cleanly
 

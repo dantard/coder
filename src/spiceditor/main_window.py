@@ -11,6 +11,7 @@ import spiceditor.resources  # noqa
 from spiceditor.admin import AdminWidget
 from spiceditor.bw_timer import CountdownTimer
 from spiceditor.dialogs import Author, ConnectionDialog
+from spiceditor.webrequest import server_url
 from spiceditor.double_tab_widget import DoubleTabWidget
 from spiceditor.editor_widget import EditorWidget
 from spiceditor.file_browser import FileBrowser
@@ -43,7 +44,8 @@ def parse_args():
     parser.add_argument("--session", "--doc", dest="session", type=str, default="1",
                         help="Collaboration session the first tab joins with --server (default: 1)")
     parser.add_argument("--server", type=str, default=None,
-                        help="Collaboration server (host:port): the first tab connects to it at startup")
+                        help="Collaboration server: host:port or a full URL such as https://name.trycloudflare.com. "
+                             "The first tab connects to it at startup")
     parser.add_argument("--admin-token", type=str, default="",
                         help="Admin token of the collaboration server, for Edit > Admin")
     parser.add_argument("--readonly", action="store_true",
@@ -59,14 +61,7 @@ class MainWindow(QMainWindow):
         if args is None:
             args = parse_args()
         # defaults offered by each tab's Connect dialog
-        self.collab_host, self.collab_port = "127.0.0.1", "5000"
-        if args.server:
-            address = args.server.split("://")[-1].rstrip("/")
-            host, _, port = address.rpartition(":")
-            if host and port.isdigit():
-                self.collab_host, self.collab_port = host, port
-            else:
-                self.collab_host = address
+        self.collab_server = server_url(args.server or "") or "http://127.0.0.1:5000"
         self.readonly = args.readonly
         self.admin_token = args.admin_token
         self.admin_widget = None
@@ -141,7 +136,10 @@ class MainWindow(QMainWindow):
             readonly_label.setStyleSheet("padding: 0 8px; font-weight: bold;")
             self.statusBar().addPermanentWidget(readonly_label)
         if args.server:
-            self.base_editor.collab_connect(args.server, args.session, self.userid)
+            if server_url(args.server):
+                self.base_editor.collab_connect(self.collab_server, args.session, self.userid)
+            else:
+                print(f"--server: '{args.server}' is not a valid server address", file=sys.stderr)
 
         self.config.load(self.script_path + "spiceditor.yaml")
         self.console_widget.config_read()
@@ -350,14 +348,14 @@ class MainWindow(QMainWindow):
     def show_admin(self):
         """Edit > Admin: who is connected to the collaboration server."""
         if self.admin_widget is None:
-            self.admin_widget = AdminWidget(f"{self.collab_host}:{self.collab_port}",
+            self.admin_widget = AdminWidget(self.collab_server,
                                             self.admin_token, self)
             self.admin_widget.setWindowFlag(Qt.Window)   # its own window, owned by Spice
             if self.admin_token:
                 self.admin_widget.start()
         elif not self.admin_widget.started:
             # not connected yet: follow the server the tabs use now
-            self.admin_widget.server_edit.setText(f"{self.collab_host}:{self.collab_port}")
+            self.admin_widget.server_edit.setText(self.collab_server)
         self.admin_widget.show()
         self.admin_widget.raise_()
         self.admin_widget.activateWindow()
@@ -369,12 +367,12 @@ class MainWindow(QMainWindow):
         """Connect button of a tab: ask for the session and join it."""
         used = {w.collab_session() for w in self.editor_widgets()}
         session = next(str(n) for n in range(1, len(used) + 2) if str(n) not in used)
-        dialog = ConnectionDialog(self.userid, self, session, self.collab_host, self.collab_port)
+        dialog = ConnectionDialog(self.userid, self, session, self.collab_server)
         if dialog.exec_() == QDialog.Accepted:
             values = dialog.get_values()
             self.userid = values["user_id"]
-            self.collab_host, self.collab_port = values["host_address"], values["host_port"]
-            editor.collab_connect(f"http://{self.collab_host}:{self.collab_port}",
+            self.collab_server = values["server"]
+            editor.collab_connect(self.collab_server,
                                   values["session"], self.userid)
         editor.update_connect_action()
 

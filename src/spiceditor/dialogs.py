@@ -6,7 +6,7 @@ except ImportError:  # running from this folder
     import webrequest
 
 from PyQt5.QtCore import Qt, QRegExp, QTimer
-from PyQt5.QtGui import QIntValidator, QRegExpValidator
+from PyQt5.QtGui import QRegExpValidator
 from PyQt5.QtWidgets import QPushButton, QTextEdit, QVBoxLayout, QDialog, QTabWidget, QWidget
 
 import sys
@@ -244,7 +244,7 @@ class ConnectionDialog(QDialog):
     """Connect a tab: either join a session that exists on the server
     (listed from GET /api/sessions) or create a new one."""
 
-    def __init__(self, userid, parent=None, session="1", host="127.0.0.1", port="5000"):
+    def __init__(self, userid, parent=None, session="1", server="127.0.0.1:5000"):
         super().__init__(parent)
         self.setWindowTitle("Connect this tab")
         self.fallback_session = session     # used if the server cannot be reached
@@ -253,14 +253,14 @@ class ConnectionDialog(QDialog):
 
         # connection fields
         self.user_id_edit = QLineEdit(userid)
-        self.host_address_edit = QLineEdit(host)
-        self.host_port_edit = QLineEdit(str(port))
-        self.host_port_edit.setValidator(QIntValidator(1, 65535, self))
+        self.server_edit = QLineEdit(server)
+        self.server_edit.setPlaceholderText("host:port or https://name.example.org")
+        self.server_edit.setToolTip("host or host:port (port 5000 if not given), "
+                                    "or a full http:// or https:// address")
 
         form = QFormLayout()
         form.addRow("User name:", self.user_id_edit)
-        form.addRow("Server Address:", self.host_address_edit)
-        form.addRow("Server Port:", self.host_port_edit)
+        form.addRow("Server:", self.server_edit)
 
         # join an existing session
         self.join_radio = QRadioButton("Join an existing session:")
@@ -323,15 +323,14 @@ class ConnectionDialog(QDialog):
         layout.addWidget(buttons)
         self.resize(460, 460)
 
-        for edit in (self.user_id_edit, self.host_address_edit, self.host_port_edit, self.session_edit):
+        for edit in (self.user_id_edit, self.server_edit, self.session_edit):
             edit.textChanged.connect(self.update_ok_button)
         # reload the list when the server changes (after a short pause in typing)
         self.reload_timer = QTimer(self)
         self.reload_timer.setSingleShot(True)
         self.reload_timer.setInterval(500)
         self.reload_timer.timeout.connect(self.load_sessions)
-        self.host_address_edit.textEdited.connect(lambda: self.reload_timer.start())
-        self.host_port_edit.textEdited.connect(lambda: self.reload_timer.start())
+        self.server_edit.textEdited.connect(lambda: self.reload_timer.start())
 
         self.update_ok_button()
         self.load_sessions()
@@ -342,12 +341,13 @@ class ConnectionDialog(QDialog):
     def load_sessions(self):
         if self.list_reply is not None:
             self.list_reply.abort()
-        host, port = self.host_address_edit.text().strip(), self.host_port_edit.text().strip()
-        if not host or not port:
+        server = webrequest.server_url(self.server_edit.text())
+        if not server:
+            self.list_status.setText("Not a valid server address")
             return
         self.list_status.setText("Loading sessions…")
         # an aborted (superseded) request never calls back
-        self.list_reply = webrequest.get(f"http://{host}:{port}/api/sessions",
+        self.list_reply = webrequest.get(f"{server}/api/sessions",
                                          self._on_sessions, timeout=4)
 
     def _on_sessions(self, ok, status, body):
@@ -401,8 +401,8 @@ class ConnectionDialog(QDialog):
 
     # ------------------------------------------------------------------
     def update_ok_button(self):
-        fields_ok = all(e.hasAcceptableInput() and e.text().strip() for e in
-                        (self.user_id_edit, self.host_address_edit, self.host_port_edit))
+        fields_ok = (bool(self.user_id_edit.text().strip())
+                     and bool(webrequest.server_url(self.server_edit.text())))
         self.create_hint.setText("")
         if self.join_radio.isChecked():
             session_ok = self.selected_session() is not None
@@ -428,7 +428,6 @@ class ConnectionDialog(QDialog):
                    else self.session_edit.text().strip())
         return {
             "user_id": self.user_id_edit.text().strip(),
-            "host_address": self.host_address_edit.text().strip(),
-            "host_port": self.host_port_edit.text().strip(),
+            "server": webrequest.server_url(self.server_edit.text()),
             "session": session,
         }
