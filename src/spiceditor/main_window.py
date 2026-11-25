@@ -39,9 +39,10 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--userid", type=str, help="User name for collaborative editing (default: computer name)",
                         default=None)
-    parser.add_argument("--doc", type=str, default="spice", help="Document name for collaborative editing")
+    parser.add_argument("--session", "--doc", dest="session", type=str, default="1",
+                        help="Collaboration session the first tab joins with --server (default: 1)")
     parser.add_argument("--server", type=str, default=None,
-                        help="Collaborative editing server (host:port) to connect to at startup")
+                        help="Collaboration server (host:port): the first tab connects to it at startup")
     parser.add_argument("--readonly", action="store_true",
                         help="The code editors cannot be edited (code can still be selected, copied and run)")
     return parser.parse_args()
@@ -54,7 +55,15 @@ class MainWindow(QMainWindow):
 
         if args is None:
             args = parse_args()
-        self.collab_doc = args.doc
+        # defaults offered by each tab's Connect dialog
+        self.collab_host, self.collab_port = "127.0.0.1", "5000"
+        if args.server:
+            address = args.server.split("://")[-1].rstrip("/")
+            host, _, port = address.rpartition(":")
+            if host and port.isdigit():
+                self.collab_host, self.collab_port = host, port
+            else:
+                self.collab_host = address
         self.readonly = args.readonly
 
         self.userid = args.userid or self.computer_name()
@@ -120,15 +129,14 @@ class MainWindow(QMainWindow):
         self.base_editor = EditorWidget(self.get_editor(), self.console_widget, self.config)
         self.base_editor.file_modified.connect(self.file_modified)
         self.base_editor.execute_called.connect(self.execute_called)
-        self.base_editor.get_editor().collab_status.connect(lambda msg: self.statusBar().showMessage(msg))
+        self.base_editor.connect_requested.connect(self.connect_tab)
         if self.readonly:
             readonly_label = QLabel("Read-only")
             readonly_label.setToolTip("Started with --readonly: the code cannot be edited")
             readonly_label.setStyleSheet("padding: 0 8px; font-weight: bold;")
             self.statusBar().addPermanentWidget(readonly_label)
         if args.server:
-            self.base_editor.get_editor().connect_to_server(args.server, args.doc,
-                                                            self.userid)
+            self.base_editor.collab_connect(args.server, args.session, self.userid)
 
         self.config.load(self.script_path + "spiceditor.yaml")
         self.console_widget.config_read()
@@ -210,7 +218,6 @@ class MainWindow(QMainWindow):
         m1 = file.addMenu("Slides")
         file.addAction("Download", self.download)
         file.addSeparator()
-        file.addAction("Connect", self.connect_to_host)
         file.addAction("Create Database", self.open_db_browser)
         file.addAction("Exit", self.close)
         m4 = menu.addMenu("Timer")
@@ -334,15 +341,21 @@ class MainWindow(QMainWindow):
         name = platform.node() or socket.gethostname() or os.environ.get("COMPUTERNAME", "")
         return name.split(".")[0] or "User"
 
-    def connect_to_host(self):
-        dialog = ConnectionDialog(self.userid, self, self.collab_doc)
+    def editor_widgets(self):
+        return [w for w in self.editors_tabs.widgets() if isinstance(w, EditorWidget)]
+
+    def connect_tab(self, editor):
+        """Connect button of a tab: ask for the session and join it."""
+        used = {w.collab_session() for w in self.editor_widgets()}
+        session = next(str(n) for n in range(1, len(used) + 2) if str(n) not in used)
+        dialog = ConnectionDialog(self.userid, self, session, self.collab_host, self.collab_port)
         if dialog.exec_() == QDialog.Accepted:
             values = dialog.get_values()
-            host = values.get("host_address")
-            port = values.get("host_port")
-            user_id = values.get("user_id")
-            self.collab_doc = values.get("document") or self.collab_doc
-            self.base_editor.get_editor().connect_to_server(f"http://{host}:{port}", self.collab_doc, user_id)
+            self.userid = values["user_id"]
+            self.collab_host, self.collab_port = values["host_address"], values["host_port"]
+            editor.collab_connect(f"http://{self.collab_host}:{self.collab_port}",
+                                  values["session"], self.userid)
+        editor.update_connect_action()
 
     def create_timer(self, hours=0, minutes=0, seconds=0):
         total_seconds = hours * 3600 + minutes * 60 + seconds
@@ -398,6 +411,7 @@ class MainWindow(QMainWindow):
             editor = EditorWidget(self.get_editor(), self.console_widget, self.config)
             editor.file_modified.connect(self.file_modified)
             editor.execute_called.connect(self.execute_called)
+            editor.connect_requested.connect(self.connect_tab)
             editor.load_program(path, self.show_all_code_action.isChecked())
             self.editors_tabs.addTab(editor, os.path.basename(path))
 
@@ -465,6 +479,11 @@ class MainWindow(QMainWindow):
         widget = self.editors_tabs.widget(index)
         if widget is self.master_widget:
             self.set_master_requested(None)
+        if isinstance(widget, EditorWidget):
+            # the tab is removed after this signal (unless it is the last one):
+            # leave its session once it is really gone
+            QTimer.singleShot(0, lambda: self.editors_tabs.indexOf(widget) == -1
+                              and widget.collab_disconnect())
 
     def file_modified(self, widget, value):
         idx = self.editors_tabs.indexOf(widget)
@@ -479,6 +498,7 @@ class MainWindow(QMainWindow):
         editor = EditorWidget(self.get_editor(), console, self.config)
         editor.file_modified.connect(self.file_modified)
         editor.execute_called.connect(self.execute_called)
+        editor.connect_requested.connect(self.connect_tab)
 
         self.editors_tabs.addTab(editor, "Code", index)
         editor.set_dark_mode(self.cfg_dark.get_value() == 1)
@@ -490,6 +510,7 @@ class MainWindow(QMainWindow):
         editor = EditorWidget(self.get_editor(), console, self.config)
         editor.file_modified.connect(self.file_modified)
         editor.execute_called.connect(self.execute_called)
+        editor.connect_requested.connect(self.connect_tab)
 
         self.editors_tabs.addTab(editor, "Code", 1)
         editor.set_dark_mode(self.cfg_dark.get_value() == 1)
@@ -598,7 +619,8 @@ class MainWindow(QMainWindow):
         #self.slides_tabs.setCurrentIndex(0)
 
     def closeEvent(self, a0):
-        self.base_editor.get_editor().leave()
+        for editor in self.editor_widgets():
+            editor.collab_disconnect()
         last = []
         for i in range(1, self.slides_tabs.count()):
             widget = self.slides_tabs.widget(i)

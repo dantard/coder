@@ -29,6 +29,7 @@
         <file>icons/circle.svg</file>
         <file>icons/radio-button.svg</file>
         <file>icons/folder.svg</file>
+        <file>icons/link.svg</file>
         </qresource>
 
 </RCC>

@@ -22,6 +22,12 @@ class MyStatusBar(QStatusBar):
         self.label.setContentsMargins(0, 5, 0, 0)
         self.addWidget(self.label)
 
+        # collaboration status of this tab, independent of the messages above
+        self.collab_label = QLabel()
+        self.collab_label.setContentsMargins(0, 5, 8, 0)
+        self.collab_label.hide()
+        self.addPermanentWidget(self.collab_label)
+
         self.buttons = []
         self.x_button = QPushButton("❌")
         self.x_button.setMaximumWidth(25)
@@ -64,13 +70,23 @@ class MyStatusBar(QStatusBar):
         self.x_button.hide()
         for button in self.buttons:
             self.removeWidget(button)
-        self.hide()
+        if not self.collab_label.text():
+            self.hide()
+
+    def set_collab_status(self, text):
+        self.collab_label.setText(text)
+        self.collab_label.setVisible(bool(text))
+        if text:
+            self.show()
+        elif not self.label.text():
+            self.hide()
 
 
 class EditorWidget(QWidget):
     file_modified = pyqtSignal(object, bool)
     focus_in = pyqtSignal(object)
     execute_called = pyqtSignal(object)
+    connect_requested = pyqtSignal(object)  # the Connect button: MainWindow asks for the session
 
     def __init__(self, language_editor, console, config):
         super().__init__()
@@ -126,11 +142,17 @@ class EditorWidget(QWidget):
         self.text_edit_group = [a1, a2, a3, self.keep_banner]
         bar.addSeparator()
 
+        # collaborative editing for this tab only
+        self.connect_action = bar.addAction("Connect")
+        self.connect_action.setCheckable(True)
+        self.connect_action.triggered.connect(self.connect_clicked)
+
         left_layout.addWidget(bar)
         left_layout.addWidget(self.language_editor)
 
         self.sb = MyStatusBar()
         left_layout.addWidget(self.sb)
+        self.language_editor.collab_status.connect(self.sb.set_collab_status)
         # left_layout.setSpacing(0)
 
         self.setLayout(left_layout)
@@ -141,6 +163,39 @@ class EditorWidget(QWidget):
 
         self.file_watcher = QFileSystemWatcher()
         self.file_watcher.fileChanged.connect(self.on_file_changed)
+
+    # ------------------------------------------------------------------
+    # collaborative editing
+    # ------------------------------------------------------------------
+    def connect_clicked(self):
+        if self.is_collab_active():
+            self.collab_disconnect()
+        else:
+            self.connect_requested.emit(self)
+        self.update_connect_action()
+
+    def collab_connect(self, server_url, session, user_name):
+        self.language_editor.connect_to_server(server_url, session, user_name)
+        self.update_connect_action()
+
+    def collab_disconnect(self):
+        self.language_editor.leave()
+        self.sb.set_collab_status("")
+        self.update_connect_action()
+
+    def is_collab_active(self):
+        return self.language_editor.collab_active
+
+    def collab_session(self):
+        return self.language_editor.doc_id if self.is_collab_active() else None
+
+    def update_connect_action(self):
+        active = self.is_collab_active()
+        self.connect_action.setChecked(active)
+        self.connect_action.setText("Disconnect" if active else "Connect")
+        self.connect_action.setToolTip(
+            f"Leave session {self.language_editor.doc_id}" if active
+            else "Share this tab's code: join a session on a collaboration server")
 
     def is_modified(self):
         return self.modified
@@ -293,6 +348,7 @@ class EditorWidget(QWidget):
         a2.setIcon(QIcon(utils.color(":/icons/refresh.svg", color)))
         a3.setIcon(QIcon(utils.color(":/icons/download.svg", color)))
         a4.setIcon(QIcon(utils.color(":/icons/hash.svg", color)))
+        self.connect_action.setIcon(QIcon(utils.color(":/icons/link.svg", color)))
 
     def get_text(self):
         self.language_editor.format_code()

@@ -1,4 +1,5 @@
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import Qt, QRegExp
+from PyQt5.QtGui import QIntValidator, QRegExpValidator
 from PyQt5.QtWidgets import QPushButton, QTextEdit, QVBoxLayout, QDialog, QTabWidget, QWidget
 
 import sys
@@ -231,37 +232,50 @@ padding: 4px 10px;
 
 
 class ConnectionDialog(QDialog):
-    def __init__(self, userid, parent=None, document="spice"):
+    def __init__(self, userid, parent=None, session="1", host="127.0.0.1", port="5000"):
         super().__init__(parent)
-        self.setWindowTitle("Connection Settings")
+        self.setWindowTitle("Connect this tab")
 
         # Fields
         self.user_id_edit = QLineEdit(userid)
-        self.host_address_edit = QLineEdit("127.0.0.1")
-        self.host_port_edit = QLineEdit("5000")
-        self.document_edit = QLineEdit(document)
+        self.host_address_edit = QLineEdit(host)
+        self.host_port_edit = QLineEdit(str(port))
+        self.host_port_edit.setValidator(QIntValidator(1, 65535, self))
+        self.session_edit = QLineEdit(session)
+        # the server accepts letters, digits, '-' and '_' (max 64)
+        self.session_edit.setValidator(QRegExpValidator(QRegExp(r"[A-Za-z0-9_-]{1,64}"), self))
+        self.session_edit.setToolTip("Tabs that join the same session share the same code")
 
         # Form layout
         form = QFormLayout()
         form.addRow("User name:", self.user_id_edit)
         form.addRow("Server Address:", self.host_address_edit)
         form.addRow("Server Port:", self.host_port_edit)
-        form.addRow("Document:", self.document_edit)
+        form.addRow("Session:", self.session_edit)
 
         # OK / Cancel buttons
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
+        self.ok_button = buttons.button(QDialogButtonBox.Ok)
+        for edit in (self.user_id_edit, self.host_address_edit, self.host_port_edit, self.session_edit):
+            edit.textChanged.connect(self.update_ok_button)
 
         # Main layout
         layout = QVBoxLayout(self)
         layout.addLayout(form)
         layout.addWidget(buttons)
+        self.update_ok_button()
+
+    def update_ok_button(self):
+        self.ok_button.setEnabled(all(e.hasAcceptableInput() and e.text().strip() for e in
+                                      (self.user_id_edit, self.host_address_edit,
+                                       self.host_port_edit, self.session_edit)))
 
     def get_values(self):
         return {
-            "user_id": self.user_id_edit.text(),
-            "host_address": self.host_address_edit.text(),
-            "host_port": self.host_port_edit.text(),
-            "document": self.document_edit.text(),
+            "user_id": self.user_id_edit.text().strip(),
+            "host_address": self.host_address_edit.text().strip(),
+            "host_port": self.host_port_edit.text().strip(),
+            "session": self.session_edit.text().strip(),
         }
