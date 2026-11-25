@@ -237,7 +237,7 @@ class CollabClientMixin:
             callback(ok, status, data)
 
     def _status(self, text):
-        msg = f"{self.doc_id} — {self.user_name} — {text}"
+        msg = f"{self.doc_id} - {self.user_name} - {text}"
         if msg != getattr(self, "_last_status", None):
             self._last_status = msg
             self.collab_status.emit(msg)
@@ -276,7 +276,7 @@ class CollabClientMixin:
         self._send_cursor()
 
     def _connected_text(self):
-        return "connected — muted" if self._muted else "connected"
+        return "connected - muted" if self._muted else "connected"
 
     def _resync(self, reason):
         """Something went badly wrong (e.g. server restarted): reload."""
@@ -285,7 +285,7 @@ class CollabClientMixin:
         if self.poll_reply is not None:
             self.poll_reply.abort()
             self.poll_reply = None
-        self._status(f"{reason} — reloading")
+        self._status(f"{reason} - reloading")
         QTimer.singleShot(500, self._load)
 
     # ------------------------------------------------------------------

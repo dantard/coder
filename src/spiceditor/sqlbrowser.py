@@ -51,7 +51,7 @@ class QueryWorker(QThread):
                 self.finished.emit(rows, cols)
             else:
                 affected = cursor.rowcount if cursor.rowcount >= 0 else 0
-                self.info.emit(f"Query OK — {affected} row(s) affected.")
+                self.info.emit(f"Query OK - {affected} row(s) affected.")
                 self.finished.emit([], [])
         except Exception as e:
             self.error.emit(str(e))
@@ -979,7 +979,7 @@ class SQLiteBrowser(QWidget):
         if self.db_path and self.db_path not in self._watcher.files():
             self._watcher.addPath(self.db_path)
         self.refresh()
-        self._set_status("Database changed externally — refreshed.")
+        self._set_status("Database changed externally - refreshed.")
 
     def _set_status(self, msg, error=False):
         if error:
@@ -1013,7 +1013,7 @@ class MainWindow(QMainWindow):
         file_menu.addAction("Quit",           self.close,               "Ctrl+Q")
 
     def _on_db_opened(self, path):
-        self.setWindowTitle(f"SQLite Browser — {os.path.basename(path)}")
+        self.setWindowTitle(f"SQLite Browser - {os.path.basename(path)}")
 
 
 # ── Entry point ───────────────────────────────────────────────────────────────
