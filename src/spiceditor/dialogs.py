@@ -1,11 +1,16 @@
-from PyQt5.QtCore import Qt, QRegExp
+import json
+
+from PyQt5.QtCore import Qt, QRegExp, QTimer, QUrl
+from PyQt5.QtNetwork import QNetworkAccessManager, QNetworkRequest
 from PyQt5.QtGui import QIntValidator, QRegExpValidator
 from PyQt5.QtWidgets import QPushButton, QTextEdit, QVBoxLayout, QDialog, QTabWidget, QWidget
 
 import sys
 from PyQt5.QtWidgets import (
     QApplication, QDialog, QDialogButtonBox,
-    QFormLayout, QLineEdit, QVBoxLayout
+    QFormLayout, QLineEdit, QVBoxLayout,
+    QButtonGroup, QGroupBox, QHBoxLayout, QHeaderView, QLabel, QRadioButton,
+    QTreeWidget, QTreeWidgetItem
 )
 
 
@@ -232,50 +237,195 @@ padding: 4px 10px;
 
 
 class ConnectionDialog(QDialog):
+    """Connect a tab: either join a session that exists on the server
+    (listed from GET /api/sessions) or create a new one."""
+
     def __init__(self, userid, parent=None, session="1", host="127.0.0.1", port="5000"):
         super().__init__(parent)
         self.setWindowTitle("Connect this tab")
+        self.fallback_session = session     # used if the server cannot be reached
+        self.existing = set()               # session names on the server
+        self.net = QNetworkAccessManager(self)
+        self.list_reply = None
 
-        # Fields
+        # connection fields
         self.user_id_edit = QLineEdit(userid)
         self.host_address_edit = QLineEdit(host)
         self.host_port_edit = QLineEdit(str(port))
         self.host_port_edit.setValidator(QIntValidator(1, 65535, self))
-        self.session_edit = QLineEdit(session)
-        # the server accepts letters, digits, '-' and '_' (max 64)
-        self.session_edit.setValidator(QRegExpValidator(QRegExp(r"[A-Za-z0-9_-]{1,64}"), self))
-        self.session_edit.setToolTip("Tabs that join the same session share the same code")
 
-        # Form layout
         form = QFormLayout()
         form.addRow("User name:", self.user_id_edit)
         form.addRow("Server Address:", self.host_address_edit)
         form.addRow("Server Port:", self.host_port_edit)
-        form.addRow("Session:", self.session_edit)
+
+        # join an existing session
+        self.join_radio = QRadioButton("Join an existing session:")
+        self.sessions_tree = QTreeWidget()
+        self.sessions_tree.setHeaderLabels(["Session", "Connected", "Size"])
+        self.sessions_tree.setRootIsDecorated(False)
+        self.sessions_tree.setMinimumHeight(140)
+        header = self.sessions_tree.header()
+        header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(1, QHeaderView.Stretch)
+        header.setSectionResizeMode(2, QHeaderView.ResizeToContents)
+        self.sessions_tree.itemSelectionChanged.connect(lambda: self.join_radio.setChecked(True))
+        self.sessions_tree.itemSelectionChanged.connect(self.update_ok_button)
+        self.sessions_tree.itemDoubleClicked.connect(lambda *_: self.ok_button.isEnabled() and self.accept())
+        self.refresh_button = QPushButton("Refresh")
+        self.refresh_button.clicked.connect(self.load_sessions)
+        self.list_status = QLabel()
+
+        # create a new session
+        self.create_radio = QRadioButton("Create a new session:")
+        self.session_edit = QLineEdit(session)
+        # the server accepts letters, digits, '-' and '_' (max 64)
+        self.session_edit.setValidator(QRegExpValidator(QRegExp(r"[A-Za-z0-9_-]{1,64}"), self))
+        self.session_edit.textEdited.connect(lambda: self.create_radio.setChecked(True))
+        self.create_hint = QLabel()
+        self.create_hint.setStyleSheet("color: #c0392b;")
+
+        mode = QButtonGroup(self)
+        mode.addButton(self.join_radio)
+        mode.addButton(self.create_radio)
+        self.create_radio.setChecked(True)
+        mode.buttonToggled.connect(lambda *_: self.update_ok_button())
+
+        join_row = QHBoxLayout()
+        join_row.addWidget(self.join_radio)
+        join_row.addStretch()
+        join_row.addWidget(self.refresh_button)
+        create_row = QHBoxLayout()
+        create_row.addWidget(self.create_radio)
+        create_row.addWidget(self.session_edit, 1)
+
+        box = QGroupBox("Session")
+        box_layout = QVBoxLayout(box)
+        box_layout.addLayout(join_row)
+        box_layout.addWidget(self.sessions_tree)
+        box_layout.addWidget(self.list_status)
+        box_layout.addSpacing(6)
+        box_layout.addLayout(create_row)
+        box_layout.addWidget(self.create_hint)
 
         # OK / Cancel buttons
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         self.ok_button = buttons.button(QDialogButtonBox.Ok)
-        for edit in (self.user_id_edit, self.host_address_edit, self.host_port_edit, self.session_edit):
-            edit.textChanged.connect(self.update_ok_button)
 
-        # Main layout
         layout = QVBoxLayout(self)
         layout.addLayout(form)
+        layout.addWidget(box)
         layout.addWidget(buttons)
+        self.resize(460, 460)
+
+        for edit in (self.user_id_edit, self.host_address_edit, self.host_port_edit, self.session_edit):
+            edit.textChanged.connect(self.update_ok_button)
+        # reload the list when the server changes (after a short pause in typing)
+        self.reload_timer = QTimer(self)
+        self.reload_timer.setSingleShot(True)
+        self.reload_timer.setInterval(500)
+        self.reload_timer.timeout.connect(self.load_sessions)
+        self.host_address_edit.textEdited.connect(lambda: self.reload_timer.start())
+        self.host_port_edit.textEdited.connect(lambda: self.reload_timer.start())
+
+        self.update_ok_button()
+        self.load_sessions()
+
+    # ------------------------------------------------------------------
+    # list of sessions on the server
+    # ------------------------------------------------------------------
+    def load_sessions(self):
+        if self.list_reply is not None:
+            self.list_reply.abort()
+        host, port = self.host_address_edit.text().strip(), self.host_port_edit.text().strip()
+        if not host or not port:
+            return
+        self.list_status.setText("Loading sessions…")
+        req = QNetworkRequest(QUrl(f"http://{host}:{port}/api/sessions"))
+        req.setTransferTimeout(4000)
+        reply = self.list_reply = self.net.get(req)
+        reply.finished.connect(lambda: self._on_sessions(reply))
+
+    def _on_sessions(self, reply):
+        if reply is not self.list_reply:       # superseded by a newer request
+            reply.deleteLater()
+            return
+        self.list_reply = None
+        status = reply.attribute(QNetworkRequest.HttpStatusCodeAttribute) or 0
+        body = bytes(reply.readAll()) if reply.isOpen() else b""
+        reply.deleteLater()
+        try:
+            sessions = json.loads(body)["sessions"] if status == 200 else None
+        except (ValueError, KeyError):
+            sessions = None
+
+        selected = self.selected_session()
+        self.sessions_tree.clear()
+        if sessions is None:
+            self.existing = set()
+            self.list_status.setText("Cannot get the sessions from this server" if status == 0
+                                     else f"The server answered HTTP {status}")
+            self.join_radio.setEnabled(False)
+            self.create_radio.setChecked(True)
+            self.update_ok_button()
+            return
+
+        self.existing = {s["session"] for s in sessions}
+        for s in sessions:
+            users = s["users"]
+            item = QTreeWidgetItem([s["session"],
+                                    f"{len(users)}: {', '.join(users)}" if users else "nobody",
+                                    f"{s['length']} chars"])
+            item.setToolTip(1, "\n".join(users))
+            self.sessions_tree.addTopLevelItem(item)
+            if s["session"] == selected:
+                item.setSelected(True)
+        self.list_status.setText(f"{len(sessions)} session(s) on the server" if sessions
+                                 else "No sessions yet: create one")
+        self.join_radio.setEnabled(bool(sessions))
+
+        # suggest a free number for a new session, unless the user typed one
+        if not self.session_edit.isModified():
+            n = 1
+            while str(n) in self.existing:
+                n += 1
+            self.session_edit.setText(str(n))
+        # default: join if there is something to join
+        if sessions and not self.session_edit.isModified():
+            self.join_radio.setChecked(True)
+            if not self.sessions_tree.selectedItems():
+                self.sessions_tree.topLevelItem(0).setSelected(True)
         self.update_ok_button()
 
+    def selected_session(self):
+        items = self.sessions_tree.selectedItems()
+        return items[0].text(0) if items else None
+
+    # ------------------------------------------------------------------
     def update_ok_button(self):
-        self.ok_button.setEnabled(all(e.hasAcceptableInput() and e.text().strip() for e in
-                                      (self.user_id_edit, self.host_address_edit,
-                                       self.host_port_edit, self.session_edit)))
+        fields_ok = all(e.hasAcceptableInput() and e.text().strip() for e in
+                        (self.user_id_edit, self.host_address_edit, self.host_port_edit))
+        self.create_hint.setText("")
+        if self.join_radio.isChecked():
+            session_ok = self.selected_session() is not None
+            self.ok_button.setText("Join")
+        else:
+            name = self.session_edit.text().strip()
+            session_ok = self.session_edit.hasAcceptableInput() and bool(name)
+            if name in self.existing:
+                session_ok = False
+                self.create_hint.setText(f"Session {name} already exists: select it in the list to join it")
+            self.ok_button.setText("Create")
+        self.ok_button.setEnabled(fields_ok and session_ok)
 
     def get_values(self):
+        session = (self.selected_session() if self.join_radio.isChecked()
+                   else self.session_edit.text().strip())
         return {
             "user_id": self.user_id_edit.text().strip(),
             "host_address": self.host_address_edit.text().strip(),
             "host_port": self.host_port_edit.text().strip(),
-            "session": self.session_edit.text().strip(),
+            "session": session,
         }

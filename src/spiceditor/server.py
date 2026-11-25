@@ -99,8 +99,12 @@ documents = {}
 documents_lock = threading.Lock()
 
 
+def valid_doc_id(doc_id):
+    return doc_id.replace("-", "").replace("_", "").isalnum() and len(doc_id) <= 64
+
+
 def get_doc(doc_id):
-    if not doc_id.replace("-", "").replace("_", "").isalnum() or len(doc_id) > 64:
+    if not valid_doc_id(doc_id):
         abort(400, "invalid document id")
     with documents_lock:
         doc = documents.get(doc_id)
@@ -117,6 +121,37 @@ def get_doc(doc_id):
 # --------------------------------------------------------------------------
 # HTTP API
 # --------------------------------------------------------------------------
+@app.get("/api/sessions")
+def list_sessions():
+    """Public list of sessions (open ones and those saved on disk), so a
+    client can choose one to join. Empty sessions nobody is in are left out."""
+    with documents_lock:
+        docs = dict(documents)
+    names = set(docs)
+    if os.path.isdir(DATA_DIR):
+        names |= {f[:-4] for f in os.listdir(DATA_DIR)
+                  if f.endswith(".txt") and valid_doc_id(f[:-4])}
+    sessions = []
+    for name in names:
+        doc = docs.get(name)
+        if doc is not None:
+            with doc.cond:
+                doc.expire_cursors()
+                users = sorted((c["name"] for c in doc.cursors.values()), key=str.lower)
+                length = len(doc.text)
+        else:
+            users = []
+            with open(os.path.join(DATA_DIR, name + ".txt"), encoding="utf-8") as f:
+                length = len(f.read())
+        if users or length:
+            sessions.append({"session": name, "users": users, "length": length})
+    # natural order: 2 before 10
+    sessions.sort(key=lambda s: (not s["session"].isdigit(),
+                                 int(s["session"]) if s["session"].isdigit() else 0,
+                                 s["session"].lower()))
+    return jsonify(sessions=sessions)
+
+
 @app.get("/api/docs/<doc_id>")
 def load(doc_id):
     doc = get_doc(doc_id)
