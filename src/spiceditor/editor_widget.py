@@ -153,6 +153,8 @@ class EditorWidget(QWidget):
         self.sb = MyStatusBar()
         left_layout.addWidget(self.sb)
         self.language_editor.collab_status.connect(self.sb.set_collab_status)
+        # e.g. disconnected by the server: the button must follow
+        self.language_editor.collab_status.connect(lambda _: self.update_connect_action())
         # left_layout.setSpacing(0)
 
         self.setLayout(left_layout)

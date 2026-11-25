@@ -47,6 +47,7 @@ class CollabClientMixin:
     def _collab_setup(self):
         self.collab_active = False   # connect_to_server() called, not left
         self._editable = True        # False: the user cannot type (see set_editable)
+        self._muted = False          # the server admin muted us: edits are rejected
         self.ready = False           # document loaded and in sync
         self.server = ""
         self.doc_id = ""
@@ -117,7 +118,8 @@ class CollabClientMixin:
         # no local undo stack while collaborating, because undo would also
         # revert other people's edits
         self.setUndoRedoEnabled(False)
-        self.setReadOnly(True)
+        self._muted = False
+        self._update_read_only()
         self.setPlaceholderText("Connecting…")
         self._load()
 
@@ -125,10 +127,19 @@ class CollabClientMixin:
         """Let the user type or not. The editor stays enabled: text can still
         be selected, copied and scrolled, and remote edits keep arriving."""
         self._editable = editable
-        self.setReadOnly(not editable or (self.collab_active and not self.ready))
+        self._update_read_only()
 
     def is_editable(self):
         return self._editable
+
+    def is_muted(self):
+        return self._muted
+
+    def _update_read_only(self):
+        """Read-only if the user may not type, the admin muted us, or we are
+        (re)loading the document."""
+        self.setReadOnly(not self._editable or self._muted
+                         or (self.collab_active and not self.ready))
 
     def is_collab_connected(self):
         return self.ready
@@ -155,14 +166,30 @@ class CollabClientMixin:
             deadline.start(500)
             while not done and deadline.isActive():
                 QApplication.processEvents()
+        self._back_to_local("disconnected")
+
+    def _back_to_local(self, reason):
+        """End the session on our side and become a local editor again."""
+        self.collab_active = False
+        self.ready = False
+        self._session += 1           # ignore replies still in flight
+        if self.poll_reply is not None:
+            self.poll_reply.abort()
+            self.poll_reply = None
         self.outstanding = self.outstanding_id = self.buffer = None
         self.remote_cursors = {}
         self._last_typed = {}
+        self._muted = False
         self._refresh_remote_cursors()
-        self.setReadOnly(not self._editable)
+        self._update_read_only()
         self.setUndoRedoEnabled(True)
         self.setPlaceholderText(self._saved_placeholder)
-        self._status("disconnected")
+        self._status(reason)
+
+    def _on_kicked(self):
+        """The server admin disconnected us."""
+        if self.collab_active:
+            self._back_to_local("disconnected by the server")
 
     # ------------------------------------------------------------------
     # small HTTP helpers (async, on the Qt event loop)
@@ -237,21 +264,24 @@ class CollabClientMixin:
         self.outstanding = self.outstanding_id = self.buffer = None
         self.cursor_version = -1
         self.ready = True
-        self.setReadOnly(not self._editable)
+        self._update_read_only()
         self.setPlaceholderText(self._saved_placeholder)
-        self._status("connected")
+        self._status(self._connected_text())
         self._poll()
-        if not data["text"] and self._initial_text and self._editable:
+        if not data["text"] and self._initial_text and self._editable and not self._muted:
             # empty document on the server: publish what we had locally
             # (never from a non-editable editor: it must not change the doc)
             self.setPlainText(self._initial_text)
         self._initial_text = ""
         self._send_cursor()
 
+    def _connected_text(self):
+        return "connected — muted" if self._muted else "connected"
+
     def _resync(self, reason):
         """Something went badly wrong (e.g. server restarted): reload."""
         self.ready = False
-        self.setReadOnly(True)
+        self._update_read_only()
         if self.poll_reply is not None:
             self.poll_reply.abort()
             self.poll_reply = None
@@ -293,7 +323,12 @@ class CollabClientMixin:
         def done(ok, status, data):
             if op_id != self.outstanding_id:
                 return                         # already acknowledged via poll
-            if status == 409:
+            if status == 410:
+                self._on_kicked()
+            elif status == 403:                # muted: the server refused our edit
+                self._muted = True
+                self._resync("muted, your change was discarded")
+            elif status == 409:
                 self._resync("out of sync")
             elif not ok:
                 self._status("send failed, retrying…")
@@ -317,6 +352,9 @@ class CollabClientMixin:
         self.poll_reply = None
         if not self.ready:
             return
+        if status == 410:
+            self._on_kicked()
+            return
         if status == 409:
             self._resync("server lost our revision")
             return
@@ -324,7 +362,10 @@ class CollabClientMixin:
             self._status("connection lost, retrying…")
             QTimer.singleShot(1500, self._poll)
             return
-        self._status("connected")
+        if data.get("muted", False) != self._muted:
+            self._muted = data.get("muted", False)
+            self._update_read_only()
+        self._status(self._connected_text())
         for item in data["ops"]:
             if item["op_id"] == self.outstanding_id:
                 self._on_ack()

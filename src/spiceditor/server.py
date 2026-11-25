@@ -11,11 +11,17 @@ The server transforms it against everything that happened since that
 revision, applies it, appends it to the history and wakes up every client
 that is long-polling for changes.
 
-Run:  python server.py --port 5000
+Clients can be muted (their edits are rejected) or disconnected through
+the admin API under /api/admin, which needs the admin token in the
+X-Admin-Token header. See admin.py for a GUI.
+
+Run:  python server.py --port 5000 [--admin-token SECRET]
 """
 import argparse
+import hmac
 import os
 import random
+import secrets
 import threading
 import time
 
@@ -30,6 +36,8 @@ app = Flask(__name__)
 
 POLL_TIMEOUT = 25          # seconds a long-poll request is held open
 CURSOR_TTL = 40            # forget users that have not polled for this long
+KICK_MEMORY = 3600         # how long a disconnected client id stays refused
+ADMIN_TOKEN = os.environ.get("SPICE_ADMIN_TOKEN", "")   # set at startup if empty
 DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 COLORS = ["#e6194b", "#3cb44b", "#4363d8", "#f58231", "#911eb4",
           "#42d4f4", "#f032e6", "#9a6324", "#469990", "#800000"]
@@ -42,6 +50,8 @@ class Document:
         self.history = []          # list of (TextOperation, client_id, op_id)
         self.seen_ops = {}         # op_id -> revision (makes POST idempotent)
         self.cursors = {}          # client_id -> dict
+        self.muted = set()         # client ids whose edits are rejected
+        self.kicked = {}           # client_id -> time it was disconnected by an admin
         self.cursor_version = 0
         self.cond = threading.Condition()
         self.dirty = False
@@ -73,11 +83,15 @@ class Document:
         dead = [cid for cid, c in self.cursors.items() if now - c["seen"] > CURSOR_TTL]
         for cid in dead:
             del self.cursors[cid]
+            self.muted.discard(cid)
         if dead:
             self.cursor_version += 1
+        for cid in [cid for cid, t in self.kicked.items() if now - t > KICK_MEMORY]:
+            del self.kicked[cid]
 
     def public_cursors(self):
-        return {cid: {k: c[k] for k in ("name", "color", "pos", "anchor")}
+        return {cid: {**{k: c[k] for k in ("name", "color", "pos", "anchor")},
+                      "muted": cid in self.muted}
                 for cid, c in self.cursors.items()}
 
 
@@ -123,8 +137,12 @@ def submit_op(doc_id):
         abort(400, f"bad request: {e}")
 
     with doc.cond:
+        if client_id in doc.kicked:
+            return jsonify(error="disconnected by the server"), 410
         if op_id in doc.seen_ops:                   # retry of an op we already have
             return jsonify(rev=doc.seen_ops[op_id])
+        if client_id in doc.muted:
+            return jsonify(error="muted"), 403
         if rev < 0 or rev > doc.rev:
             return jsonify(error="unknown revision, reload the document"), 409
 
@@ -158,6 +176,8 @@ def update_cursor(doc_id):
         abort(400, f"bad request: {e}")
 
     with doc.cond:
+        if client_id in doc.kicked:
+            return jsonify(error="disconnected by the server"), 410
         if rev < 0 or rev > doc.rev:
             return jsonify(error="unknown revision"), 409
         # the position refers to revision `rev`: bring it up to date
@@ -185,6 +205,8 @@ def poll(doc_id):
 
     deadline = time.time() + POLL_TIMEOUT
     with doc.cond:
+        if client_id in doc.kicked:
+            return jsonify(error="disconnected by the server"), 410
         if since > doc.rev:
             return jsonify(error="unknown revision, reload the document"), 409
         if client_id:
@@ -194,6 +216,8 @@ def poll(doc_id):
             if remaining <= 0:
                 break
             doc.cond.wait(remaining)
+            if client_id in doc.kicked:
+                return jsonify(error="disconnected by the server"), 410
             if client_id:
                 # only keep an existing cursor alive: if the client left
                 # meanwhile, this request must not bring it back as "anonymous"
@@ -202,7 +226,7 @@ def poll(doc_id):
         ops = [{"op": op.to_json(), "client_id": cid, "op_id": oid}
                for op, cid, oid in doc.history[since:]]
         return jsonify(ops=ops, rev=doc.rev, cv=doc.cursor_version,
-                       cursors=doc.public_cursors())
+                       cursors=doc.public_cursors(), muted=client_id in doc.muted)
 
 
 @app.post("/api/docs/<doc_id>/leave")
@@ -213,6 +237,71 @@ def leave(doc_id):
         if doc.cursors.pop(client_id, None) is not None:
             doc.cursor_version += 1
             doc.cond.notify_all()
+        doc.muted.discard(client_id)
+    return jsonify(ok=True)
+
+
+# --------------------------------------------------------------------------
+# admin API (needs the admin token)
+# --------------------------------------------------------------------------
+@app.before_request
+def check_admin_token():
+    if request.path.startswith("/api/admin/"):
+        token = request.headers.get("X-Admin-Token", "")
+        if not ADMIN_TOKEN or not hmac.compare_digest(token, ADMIN_TOKEN):
+            return jsonify(error="wrong or missing admin token"), 401
+
+
+@app.get("/api/admin/clients")
+def admin_clients():
+    """Every session with its connected clients."""
+    with documents_lock:
+        docs = list(documents.values())
+    now = time.time()
+    sessions = []
+    for doc in sorted(docs, key=lambda d: d.id):
+        with doc.cond:
+            doc.expire_cursors()
+            clients = [{"client_id": cid, "name": c["name"], "color": c["color"],
+                        "seen": round(now - c["seen"], 1), "muted": cid in doc.muted}
+                       for cid, c in doc.cursors.items()]
+            sessions.append({"session": doc.id, "rev": doc.rev,
+                             "length": len(doc.text),
+                             "clients": sorted(clients, key=lambda c: c["name"].lower())})
+    return jsonify(sessions=sessions)
+
+
+def _check_client(doc, client_id):
+    """Call with doc.cond held."""
+    if client_id not in doc.cursors:
+        abort(404, "no such client in this session")
+
+
+@app.post("/api/admin/docs/<doc_id>/clients/<client_id>/mute")
+def admin_mute(doc_id, client_id):
+    muted = bool((request.get_json(silent=True) or {}).get("muted", True))
+    doc = get_doc(doc_id)
+    with doc.cond:
+        _check_client(doc, client_id)
+        if muted:
+            doc.muted.add(client_id)
+        else:
+            doc.muted.discard(client_id)
+        doc.cursor_version += 1        # wakes the client's poll: it learns at once
+        doc.cond.notify_all()
+    return jsonify(ok=True, muted=muted)
+
+
+@app.post("/api/admin/docs/<doc_id>/clients/<client_id>/kick")
+def admin_kick(doc_id, client_id):
+    doc = get_doc(doc_id)
+    with doc.cond:
+        _check_client(doc, client_id)
+        doc.kicked[client_id] = time.time()
+        doc.cursors.pop(client_id, None)
+        doc.muted.discard(client_id)
+        doc.cursor_version += 1
+        doc.cond.notify_all()          # its waiting poll returns 410 now
     return jsonify(ok=True)
 
 
@@ -240,7 +329,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--host", default="0.0.0.0")
     parser.add_argument("--port", type=int, default=5000)
+    parser.add_argument("--admin-token", default=None,
+                        help="token for the admin API (default: $SPICE_ADMIN_TOKEN or a random one)")
     args = parser.parse_args()
+    ADMIN_TOKEN = args.admin_token or ADMIN_TOKEN or secrets.token_urlsafe(12)
+    print(f" * Admin token: {ADMIN_TOKEN}", flush=True)
     threading.Thread(target=saver, daemon=True).start()
     # threaded=True is required: every client keeps one long-poll request open
     app.run(host=args.host, port=args.port, threaded=True)
